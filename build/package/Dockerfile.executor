@@ -1,0 +1,34 @@
+# Build Stage
+FROM golang:1.25-alpine AS builder
+
+WORKDIR /app
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+RUN go build -o /praetor-executor ./cmd/executor
+
+# Run Stage
+FROM alpine:3.19
+
+# Install Ansible Runner dependencies
+RUN apk add --no-cache python3 py3-pip build-base python3-dev libffi-dev openssl-dev openssh-client \
+    && python3 -m venv /venv \
+    && . /venv/bin/activate \
+    && pip install --upgrade pip \
+    && pip install ansible-runner ansible-core
+
+ENV PATH="/venv/bin:$PATH"
+
+WORKDIR /
+
+COPY --from=builder /praetor-executor /praetor-executor
+
+# Create a non-root user with a home directory
+RUN adduser -D -u 1000 praetor
+USER praetor
+ENV HOME=/home/praetor
+
+CMD ["/praetor-executor"]

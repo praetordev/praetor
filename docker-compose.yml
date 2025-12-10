@@ -1,0 +1,152 @@
+services:
+  nats:
+    image: nats:latest
+    ports:
+      - "4222:4222"
+    networks:
+      - praetor-net
+
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: praetor
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - praetor-net
+
+  migrator:
+    build:
+      context: .
+      dockerfile: build/package/Dockerfile.migrator
+    environment:
+      # Use service name 'db'
+      DATABASE_URL: postgres://postgres:postgres@db:5432/praetor?sslmode=disable
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - praetor-net
+    # Run once and exit
+    restart: on-failure
+
+  api:
+    build:
+      context: .
+      dockerfile: build/package/Dockerfile.api
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/praetor?sslmode=disable
+      PORT: 8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+    networks:
+      - praetor-net
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: build/package/Dockerfile.scheduler
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/praetor?sslmode=disable
+      NATS_URL: nats://nats:4222
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+      nats:
+        condition: service_started
+    networks:
+      - praetor-net
+
+  executor:
+    build:
+      context: .
+      dockerfile: build/package/Dockerfile.executor
+    environment:
+      NATS_URL: nats://nats:4222
+    volumes:
+      - ./keys/id_rsa:/home/praetor/.ssh/id_rsa:ro
+    depends_on:
+      nats:
+        condition: service_started
+    networks:
+      - praetor-net
+
+  # Demo cluster - target hosts for Ansible playbooks
+  web1:
+    image: alpine:3.19
+    hostname: web1
+    command: /bin/sh -c "apk add --no-cache openssh python3 && ssh-keygen -A && mkdir -p /root/.ssh && chmod 700 /root/.ssh && cat /tmp/keys/id_rsa.pub > /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys && /usr/sbin/sshd -D"
+    volumes:
+      - ./keys:/tmp/keys:ro
+    networks:
+      - praetor-net
+
+  web2:
+    image: alpine:3.19
+    hostname: web2
+    command: /bin/sh -c "apk add --no-cache openssh python3 && ssh-keygen -A && mkdir -p /root/.ssh && chmod 700 /root/.ssh && cat /tmp/keys/id_rsa.pub > /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys && /usr/sbin/sshd -D"
+    volumes:
+      - ./keys:/tmp/keys:ro
+    networks:
+      - praetor-net
+
+  db1:
+    image: alpine:3.19
+    hostname: db1
+    command: /bin/sh -c "apk add --no-cache openssh python3 && ssh-keygen -A && mkdir -p /root/.ssh && chmod 700 /root/.ssh && cat /tmp/keys/id_rsa.pub > /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys && /usr/sbin/sshd -D"
+    volumes:
+      - ./keys:/tmp/keys:ro
+    networks:
+      - praetor-net
+
+  # Keep backward compatibility
+  target-host:
+    image: alpine:3.19
+    hostname: target-host
+    command: /bin/sh -c "apk add --no-cache openssh python3 && ssh-keygen -A && mkdir -p /root/.ssh && chmod 700 /root/.ssh && cat /tmp/keys/id_rsa.pub > /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys && /usr/sbin/sshd -D"
+    volumes:
+      - ./keys:/tmp/keys:ro
+    networks:
+      - praetor-net
+
+  consumer:
+    build:
+      context: .
+      dockerfile: build/package/Dockerfile.consumer
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/praetor?sslmode=disable
+      NATS_URL: nats://nats:4222
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+      nats:
+        condition: service_started
+    networks:
+      - praetor-net
+
+  ui:
+    build:
+      context: web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    networks:
+      - praetor-net
+
+networks:
+  praetor-net:
+    driver: bridge

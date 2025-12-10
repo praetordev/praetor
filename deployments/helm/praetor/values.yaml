@@ -1,0 +1,30 @@
+image:
+  repository: praetor
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "latest"
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 8080
+
+resources:
+  limits:
+    cpu: 100m
+    memory: 128Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+nats:
+  image: nats:latest
+  service:
+    port: 4222
+
+postgres:
+  image: postgres:15
+  user: postgres
+  password: postgres
+  db: praetor

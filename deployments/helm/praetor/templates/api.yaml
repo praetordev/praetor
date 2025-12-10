@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "praetor.fullname" . }}-api
+  labels:
+    {{- include "praetor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "praetor.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        {{- include "praetor.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: api
+    spec:
+      initContainers:
+        - name: wait-for-db
+          image: busybox
+          command: ['sh', '-c', 'until nc -z {{ include "praetor.fullname" . }}-db 5432; do echo waiting for db; sleep 2; done;']
+      containers:
+        - name: api
+          image: "praetor-api:latest"
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: DATABASE_URL
+              value: "postgres://{{ .Values.postgres.user }}:{{ .Values.postgres.password }}@{{ include "praetor.fullname" . }}-db:5432/{{ .Values.postgres.db }}?sslmode=disable"
+            - name: PORT
+              value: "8080"
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "praetor.fullname" . }}-api
+  labels:
+    {{- include "praetor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "praetor.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: api

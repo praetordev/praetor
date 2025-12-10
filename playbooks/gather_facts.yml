@@ -1,0 +1,46 @@
+---
+# gather_facts.yml - Collect and display system facts from all hosts
+- name: Gather Host Facts
+  hosts: all
+  gather_facts: yes
+  
+  tasks:
+    - name: Display OS Information
+      debug:
+        msg: |
+          Hostname: {{ ansible_hostname }}
+          OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          Kernel: {{ ansible_kernel }}
+          Architecture: {{ ansible_architecture }}
+      
+    - name: Display Network Information
+      debug:
+        msg: |
+          IP Address: {{ ansible_default_ipv4.address | default('N/A') }}
+          MAC Address: {{ ansible_default_ipv4.macaddress | default('N/A') }}
+          Interface: {{ ansible_default_ipv4.interface | default('N/A') }}
+
+    - name: Display Memory Information
+      debug:
+        msg: |
+          Total Memory: {{ ansible_memtotal_mb }} MB
+          Free Memory: {{ ansible_memfree_mb }} MB
+          Swap Total: {{ ansible_swaptotal_mb }} MB
+          
+    - name: Display CPU Information
+      debug:
+        msg: |
+          CPU Count: {{ ansible_processor_count }}
+          CPU Cores: {{ ansible_processor_cores }}
+          vCPUs: {{ ansible_processor_vcpus }}
+
+    - name: Create summary file
+      copy:
+        content: |
+          Host Facts Summary for {{ ansible_hostname }}
+          =============================================
+          OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          IP: {{ ansible_default_ipv4.address | default('N/A') }}
+          Memory: {{ ansible_memtotal_mb }} MB
+          CPUs: {{ ansible_processor_vcpus }}
+        dest: /tmp/host_facts.txt

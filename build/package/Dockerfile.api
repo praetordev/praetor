@@ -1,0 +1,24 @@
+# Build Stage
+FROM golang:1.25-alpine AS builder
+
+WORKDIR /app
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+RUN go build -o /praetor-api ./cmd/api
+
+# Run Stage
+FROM alpine:3.19
+
+WORKDIR /
+
+COPY --from=builder /praetor-api /praetor-api
+
+EXPOSE 8080
+
+USER 1000:1000
+
+CMD ["/praetor-api"]

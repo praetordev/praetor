@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "praetor.fullname" . }}-scheduler
+  labels:
+    {{- include "praetor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: scheduler
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "praetor.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: scheduler
+  template:
+    metadata:
+      labels:
+        {{- include "praetor.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: scheduler
+    spec:
+      initContainers:
+        - name: wait-for-db
+          image: busybox
+          command: ['sh', '-c', 'until nc -z {{ include "praetor.fullname" . }}-db 5432; do echo waiting for db; sleep 2; done;']
+        - name: wait-for-nats
+          image: busybox
+          command: ['sh', '-c', 'until nc -z {{ include "praetor.fullname" . }}-nats 4222; do echo waiting for nats; sleep 2; done;']
+      containers:
+        - name: scheduler
+          image: "praetor-scheduler:latest"
+          imagePullPolicy: Never
+          env:
+            - name: DATABASE_URL
+              value: "postgres://{{ .Values.postgres.user }}:{{ .Values.postgres.password }}@{{ include "praetor.fullname" . }}-db:5432/{{ .Values.postgres.db }}?sslmode=disable"
+            - name: NATS_URL
+              value: "nats://{{ include "praetor.fullname" . }}-nats:4222"
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

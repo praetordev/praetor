@@ -1,0 +1,26 @@
+# Build Stage
+FROM golang:1.25-alpine AS builder
+
+WORKDIR /app
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+RUN go build -o /praetor-migrator ./cmd/migrator
+
+# Run Stage
+FROM alpine:3.19
+
+WORKDIR /app
+
+# Copy binary
+COPY --from=builder /praetor-migrator /usr/local/bin/praetor-migrator
+# Copy migrations folder so the binary can read it
+COPY --from=builder /app/db/migrations /app/db/migrations
+
+USER 1000:1000
+
+# Run from /app so relative path "db/migrations" works if binary expects it
+CMD ["praetor-migrator"]

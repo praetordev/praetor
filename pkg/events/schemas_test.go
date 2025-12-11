@@ -16,7 +16,8 @@ func TestExecutionRequestSerialization(t *testing.T) {
 		UnifiedJobID:   123,
 		JobManifest: events.JobManifest{
 			Inventory:       "hosts",
-			ProjectContent:  "/tmp/proj",
+			ProjectURL:      "https://github.com/example/repo.git",
+			Playbook:        "playbook.yml",
 			ExtraVars:       map[string]interface{}{"foo": "bar"},
 			EnvironmentRefs: []string{"env1"},
 		},

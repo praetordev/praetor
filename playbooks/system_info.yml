@@ -1,0 +1,25 @@
+---
+- name: System Information
+  hosts: all
+  gather_facts: yes
+  
+  tasks:
+    - name: Display OS Info
+      debug:
+        msg: |
+          Hostname: {{ ansible_hostname }}
+          OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          Kernel: {{ ansible_kernel }}
+          Architecture: {{ ansible_architecture }}
+
+    - name: Display Memory Info  
+      debug:
+        msg: |
+          Total Memory: {{ ansible_memtotal_mb }} MB
+          Free Memory: {{ ansible_memfree_mb }} MB
+
+    - name: Display CPU Info
+      debug:
+        msg: |
+          CPU Count: {{ ansible_processor_count }}
+          vCPUs: {{ ansible_processor_vcpus }}

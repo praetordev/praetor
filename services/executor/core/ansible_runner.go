@@ -1,8 +1,12 @@
 package core
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -63,15 +67,51 @@ func (r *AnsibleRunner) Run(req *events.ExecutionRequest, eventChan chan<- event
 	go r.watchEvents(runDir, req, eventChan, doneChan)
 
 	// 3. Exec ansible-runner with verbosity for detailed output
-	log.Printf("AnsibleRunner: Executing ansible-runner...")
-	cmd := exec.Command("ansible-runner", "run", runDir, "-p", "playbook.yml", "-v")
-	// cmd.Stdout = os.Stdout // Debug
-	// cmd.Stderr = os.Stderr // Debug
+	// Use playbook path from manifest, default to playbook.yml
+	playbookPath := req.JobManifest.Playbook
+	if playbookPath == "" {
+		playbookPath = "playbook.yml"
+	}
+	log.Printf("AnsibleRunner: Executing ansible-runner with playbook %s...", playbookPath)
+	cmd := exec.Command("ansible-runner", "run", runDir, "-p", playbookPath, "-v")
+	var stdoutBuf, stderrBuf bytes.Buffer
+	cmd.Stdout = &stdoutBuf
+	cmd.Stderr = &stderrBuf
+
+	// Emit explicit STARTED event
+	eventChan <- events.JobEvent{
+		ExecutionRunID: req.ExecutionRunID,
+		UnifiedJobID:   req.UnifiedJobID,
+		EventType:      "JOB_STARTED",
+		Timestamp:      time.Now(),
+	}
 
 	if err := cmd.Run(); err != nil {
 		// Runner failed (could be playbook failure or system failure)
 		log.Printf("AnsibleRunner: execution failed: %v", err)
-		// We don't return error here immediately because we want to ensure events are flushed
+		log.Printf("AnsibleRunner Stdout: %s", stdoutBuf.String())
+		log.Printf("AnsibleRunner Stderr: %s", stderrBuf.String())
+
+		// Emit explicit failure event since runner output might not have been captured
+		// Emit explicit failure event
+		// We do NOT include Stderr here to avoid duplicating logs, as ansible-runner output is already streamed.
+		// Only if the runner failed to start (no events) would this be critical, but we assume stream works.
+		msg := fmt.Sprintf("Ansible execution process failed: %v", err)
+		eventChan <- events.JobEvent{
+			ExecutionRunID: req.ExecutionRunID,
+			UnifiedJobID:   req.UnifiedJobID,
+			EventType:      "JOB_FAILED",
+			Timestamp:      time.Now(),
+			StdoutSnippet:  &msg,
+		}
+	} else {
+		// Emit explicit COMPLETED event on success
+		eventChan <- events.JobEvent{
+			ExecutionRunID: req.ExecutionRunID,
+			UnifiedJobID:   req.UnifiedJobID,
+			EventType:      "JOB_COMPLETED",
+			Timestamp:      time.Now(),
+		}
 	}
 
 	// 4. Cleanup / Finish
@@ -104,25 +144,100 @@ func (r *AnsibleRunner) prepareDirectory(runDir string, req *events.ExecutionReq
 
 	// Inventory
 	inv := req.JobManifest.Inventory
+	log.Printf("AnsibleRunner: Received Inventory Length: %d", len(inv))
+	if len(inv) > 100 {
+		log.Printf("AnsibleRunner: Inventory Content Head: %s", inv[:100])
+	} else {
+		log.Printf("AnsibleRunner: Inventory Content: %s", inv)
+	}
+
 	if inv == "" {
 		inv = "localhost ansible_connection=local"
 	}
-	if err := os.WriteFile(filepath.Join(runDir, "inventory", "hosts"), []byte(inv), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(runDir, "inventory", "hosts.ini"), []byte(inv), 0644); err != nil {
 		return err
 	}
 
-	// Playbook
-	play := req.JobManifest.ProjectContent
-	if play == "" {
-		// Default ping playbook
-		play = "- hosts: all\n  tasks:\n    - name: Ping\n      ping:"
-	}
-	if err := os.WriteFile(filepath.Join(runDir, "project", "playbook.yml"), []byte(play), 0644); err != nil {
-		return err
+	// Project - clone from git if URL provided
+	projectURL := req.JobManifest.ProjectURL
+	if projectURL != "" {
+		// Clone the project repository
+		projectDir := filepath.Join(runDir, "project")
+		log.Printf("Cloning project from %s to %s", projectURL, projectDir)
+
+		cmd := exec.Command("git", "clone", "--depth", "1", projectURL, projectDir)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("failed to clone project: %w\n%s", err, string(output))
+		}
+		log.Printf("Cloned project successfully")
+	} else {
+		// Use inline playbook content if provided, otherwise default to ping
+		play := req.JobManifest.PlaybookContent
+		if play == "" {
+			play = "- hosts: all\n  tasks:\n    - name: Ping\n      ping:"
+		}
+
+		if err := os.WriteFile(filepath.Join(runDir, "project", "playbook.yml"), []byte(play), 0644); err != nil {
+			return err
+		}
 	}
 
 	// ExtraVars
 	// TODO: Marshal map to JSON/YAML and write to env/extravars
+
+	return nil
+}
+
+// extractTarGz extracts a tar.gz byte slice to the target directory
+func extractTarGz(data []byte, targetDir string) error {
+	gr, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
+	defer gr.Close()
+
+	tr := tar.NewReader(gr)
+
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		targetPath := filepath.Join(targetDir, header.Name)
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(targetPath, 0755); err != nil {
+				return err
+			}
+		case tar.TypeReg:
+			// Ensure parent directory exists
+			if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+				return err
+			}
+
+			outFile, err := os.Create(targetPath)
+			if err != nil {
+				return err
+			}
+
+			if _, err := io.Copy(outFile, tr); err != nil {
+				outFile.Close()
+				return err
+			}
+			outFile.Close()
+
+			// Set permissions
+			if err := os.Chmod(targetPath, os.FileMode(header.Mode)); err != nil {
+				return err
+			}
+		}
+	}
 
 	return nil
 }
@@ -142,6 +257,13 @@ func (r *AnsibleRunner) watchEvents(runDir string, req *events.ExecutionRequest,
 	for {
 		select {
 		case <-doneChan:
+			// Ensure we try to find the dir one last time if we haven't found it yet
+			if eventsDir == "" {
+				matches, _ := filepath.Glob(filepath.Join(runDir, "artifacts", "*", "job_events"))
+				if len(matches) > 0 {
+					eventsDir = matches[0]
+				}
+			}
 			r.processNewEvents(eventsDir, req, eventChan, seenEvents)
 			return
 		case <-ticker.C:

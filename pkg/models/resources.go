@@ -23,6 +23,7 @@ type Inventory struct {
 	Name           string    `json:"name" db:"name"`
 	Description    *string   `json:"description,omitempty" db:"description"`
 	Kind           string    `json:"kind" db:"kind"`
+	Content        *string   `json:"content,omitempty" db:"content"`
 	CreatedAt      time.Time `json:"created_at" db:"created_at"`
 	ModifiedAt     time.Time `json:"modified_at" db:"modified_at"`
 }

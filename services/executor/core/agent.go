@@ -2,6 +2,8 @@ package core
 
 import (
 	"log"
+	"os"
+	"strconv"
 	"sync"
 
 	"github.com/praetordev/praetor/pkg/events"
@@ -16,11 +18,18 @@ type Agent struct {
 }
 
 func NewAgent(sub EventSubscriber, pub EventPublisher, runner Runner) *Agent {
+	workers := 2
+	if val := os.Getenv("EXECUTOR_WORKERS"); val != "" {
+		if n, err := strconv.Atoi(val); err == nil && n > 0 {
+			workers = n
+		}
+	}
+
 	return &Agent{
 		Subscriber: sub,
 		Publisher:  pub,
 		Runner:     runner,
-		Workers:    5, // Default worker pool size
+		Workers:    workers,
 	}
 }
 

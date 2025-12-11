@@ -1,0 +1,13 @@
+---
+- name: Check Uptime
+  hosts: all
+  gather_facts: no
+  
+  tasks:
+    - name: Get uptime
+      command: uptime
+      register: uptime_result
+
+    - name: Show uptime
+      debug:
+        msg: "{{ inventory_hostname }}: {{ uptime_result.stdout }}"

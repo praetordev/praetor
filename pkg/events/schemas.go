@@ -24,8 +24,11 @@ type ExecutionRequest struct {
 // JobManifest contains all resolved configuration for the job execution.
 type JobManifest struct {
 	// For now, minimal fields as per vision doc example
-	Inventory       string                 `json:"inventory"`       // Raw inventory or path
-	ProjectContent  string                 `json:"project_content"` // Path or reference
+	Inventory       string                 `json:"inventory"`        // Raw inventory INI content
+	ProjectURL      string                 `json:"project_url"`      // Git URL for project
+	ProjectRef      string                 `json:"project_ref"`      // Git branch/tag/commit (optional)
+	Playbook        string                 `json:"playbook"`         // Playbook file path within project
+	PlaybookContent string                 `json:"playbook_content"` // Inline playbook content (optional)
 	ExtraVars       map[string]interface{} `json:"extra_vars"`
 	EnvironmentRefs []string               `json:"environment_refs"`
 }

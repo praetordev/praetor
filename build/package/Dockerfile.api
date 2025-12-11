@@ -17,6 +17,9 @@ WORKDIR /
 
 COPY --from=builder /praetor-api /praetor-api
 
+# Install git for project sync
+RUN apk add --no-cache git ca-certificates
+
 EXPOSE 8080
 
 USER 1000:1000

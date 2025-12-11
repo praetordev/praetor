@@ -11,24 +11,36 @@ COPY . .
 RUN go build -o /praetor-executor ./cmd/executor
 
 # Run Stage
-FROM alpine:3.19
+FROM python:3.11-slim
 
-# Install Ansible Runner dependencies
-RUN apk add --no-cache python3 py3-pip build-base python3-dev libffi-dev openssl-dev openssh-client \
-    && python3 -m venv /venv \
-    && . /venv/bin/activate \
-    && pip install --upgrade pip \
-    && pip install ansible-runner ansible-core
+# Install system dependencies
+# git: for cloning
+# openssh-client: for ssh connections
+# libssl-dev, libffi-dev, build-essential: for compiling python deps if needed
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    openssh-client \
+    build-essential \
+    libssl-dev \
+    libffi-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-ENV PATH="/venv/bin:$PATH"
+# Install Ansible
+# We can install directly into system python since this is a dedicated container
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir ansible-runner ansible-core PyMySQL
 
 WORKDIR /
 
 COPY --from=builder /praetor-executor /praetor-executor
 
-# Create a non-root user with a home directory
-RUN adduser -D -u 1000 praetor
+# Create a non-root user
+RUN useradd -m -u 1000 praetor
 USER praetor
 ENV HOME=/home/praetor
+
+# Install Ansible collections as the runtime user
+# Ensure ~/.local/bin is in PATH if needed, though collections go to ~/.ansible
+RUN ansible-galaxy collection install ansible.posix community.general community.mysql
 
 CMD ["/praetor-executor"]

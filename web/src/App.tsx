@@ -1,55 +1,39 @@
 import { useState, useEffect } from 'react'
 import './App.css'
+import type { Job, JobEvent, Project, JobTemplate, Inventory, Host, Group } from './types'
 
-interface Job {
-  id: number;
-  name: string;
-  status: string;
-  created_at: string;
-  current_run_id?: string;
-}
+// Components
+import Layout from './components/Layout'
+import Sidebar from './components/Sidebar'
 
-interface JobEvent {
-  seq: number;
-  event_type: string;
-  stdout_snippet: string;
-  created_at: string;
-  current_run_id?: string;
-  task_name?: string;
-}
-
-interface Project {
-  id: number;
-  name: string;
-  scm_url: string;
-  scm_type: string;
-}
-
-interface JobTemplate {
-  id: number;
-  name: string;
-  project_id?: number;
-  playbook: string;
-  organization_id: number;
-}
+// Pages
+import DashboardPage from './pages/DashboardPage'
+import JobsPage from './pages/JobsPage'
+import ProjectsPage from './pages/ProjectsPage'
+import TemplatesPage from './pages/TemplatesPage'
+import InventoriesPage from './pages/InventoriesPage'
 
 function App() {
+  // Global Navigation State
+  const [activeTab, setActiveTab] = useState('dashboard')
+
+  // Data States
   const [jobs, setJobs] = useState<Job[]>([])
   const [selectedRunID, setSelectedRunID] = useState<string | null>(null)
   const [logs, setLogs] = useState<JobEvent[]>([])
 
-  // Projects State
-  const [activeTab, setActiveTab] = useState('jobs')
   const [projects, setProjects] = useState<Project[]>([])
-  const [newProjectName, setNewProjectName] = useState('')
-  const [newProjectURL, setNewProjectURL] = useState('')
-
-  // Templates State
   const [templates, setTemplates] = useState<JobTemplate[]>([])
-  const [newTemplateName, setNewTemplateName] = useState('')
-  const [newTemplateProjectId, setNewTemplateProjectId] = useState<number | null>(null)
-  const [newTemplatePlaybook, setNewTemplatePlaybook] = useState('playbook.yml')
-  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null)
+  const [inventories, setInventories] = useState<Inventory[]>([])
+
+  // Inventory/Host/Group Selection States
+  const [selectedInventoryId, setSelectedInventoryId] = useState<number | null>(null)
+  const [hosts, setHosts] = useState<Host[]>([])
+  const [groups, setGroups] = useState<Group[]>([])
+  const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null)
+  const [groupHosts, setGroupHosts] = useState<Host[]>([])
+
+  // --- API FETCHERS ---
 
   const fetchJobs = () => {
     fetch('/api/v1/jobs')
@@ -79,22 +63,48 @@ function App() {
       .catch(err => console.error("Failed to fetch templates", err))
   }
 
+  const fetchInventories = () => {
+    fetch('/api/v1/inventories')
+      .then(res => res.json())
+      .then(data => setInventories(data.items || []))
+      .catch(err => console.error("Failed to fetch inventories", err))
+  }
+
+  const fetchHosts = (inventoryId: number) => {
+    fetch(`/api/v1/inventories/${inventoryId}/hosts`)
+      .then(res => res.json())
+      .then(data => setHosts(data || []))
+      .catch(err => console.error("Failed to fetch hosts", err))
+  }
+
+  const fetchGroups = (inventoryId: number) => {
+    fetch(`/api/v1/inventories/${inventoryId}/groups`)
+      .then(res => res.json())
+      .then(data => setGroups(data || []))
+      .catch(err => console.error("Failed to fetch groups", err))
+  }
+
+  const fetchGroupHosts = (groupId: number) => {
+    fetch(`/api/v1/groups/${groupId}/hosts`)
+      .then(res => res.json())
+      .then(data => setGroupHosts(data || []))
+      .catch(err => console.error("Failed to fetch group hosts", err))
+  }
+
+  // --- EFFECTS ---
+
+  // Initial Load & Polling
   useEffect(() => {
     fetchJobs()
-    fetchTemplates() // Load templates for job launch dropdown
+    fetchTemplates()
+    fetchProjects()
+    fetchInventories()
+
     const interval = setInterval(fetchJobs, 2000)
     return () => clearInterval(interval)
   }, [])
 
-  useEffect(() => {
-    if (activeTab === 'projects') {
-      fetchProjects()
-    } else if (activeTab === 'templates') {
-      fetchTemplates()
-      fetchProjects() // Need projects for dropdown
-    }
-  }, [activeTab])
-
+  // Poll Logs if viewing
   useEffect(() => {
     if (selectedRunID) {
       fetchLogs(selectedRunID)
@@ -103,12 +113,12 @@ function App() {
     }
   }, [selectedRunID])
 
-  const launchJob = () => {
-    const payload: { name: string; unified_job_template_id?: number } = {
-      name: `web-job-${Date.now()}`
-    }
-    if (selectedTemplateId) {
-      payload.unified_job_template_id = selectedTemplateId
+  // --- ACTION HANDLERS ---
+
+  const handleLaunchJob = (templateId: number) => {
+    const payload = {
+      name: `web-auto-job-${Date.now()}`,
+      unified_job_template_id: templateId
     }
     fetch('/api/v1/jobs', {
       method: 'POST',
@@ -119,222 +129,215 @@ function App() {
       .catch(err => console.error("Failed to launch job", err))
   }
 
-  const createTemplate = () => {
-    if (!newTemplateName || !newTemplateProjectId) return
-    fetch('/api/v1/job-templates', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: newTemplateName,
-        project_id: newTemplateProjectId,
-        playbook: newTemplatePlaybook,
-        organization_id: 1
-      })
-    })
-      .then(() => {
-        setNewTemplateName('')
-        setNewTemplateProjectId(null)
-        setNewTemplatePlaybook('playbook.yml')
-        fetchTemplates()
-      })
-      .catch(err => console.error("Failed to create template", err))
-  }
-
-  const createProject = () => {
-    if (!newProjectName || !newProjectURL) return
+  const handleCreateProject = (name: string, url: string) => {
     fetch('/api/v1/projects', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        name: newProjectName,
-        scm_url: newProjectURL,
+        name,
+        scm_url: url,
         scm_type: 'git',
         organization_id: 1
       })
     })
-      .then(() => {
-        setNewProjectName('')
-        setNewProjectURL('')
-        fetchProjects()
-      })
+      .then(() => fetchProjects())
       .catch(err => console.error("Failed to create project", err))
   }
 
+  const handleSyncProject = (id: number) => {
+    return fetch(`/api/v1/projects/${id}/sync`, { method: 'POST' })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          fetchProjects() // Refresh
+          const cleanRev = data.revision ? data.revision.trim() : 'N/A'
+          const cleanMsg = data.commit_msg ? data.commit_msg.trim() : 'N/A'
+          alert(`✅ Project Synced Successfully!\n\nVerified Commit: ${cleanRev}\nSubject: ${cleanMsg}`)
+          return true
+        } else {
+          alert('Sync Failed: ' + data.error)
+          return false
+        }
+      })
+      .catch(err => {
+        alert('Sync Request Failed: ' + err)
+        return false
+      })
+  }
+
+  const handleCreateTemplate = (name: string, projectId: number, inventoryId: number, playbook: string) => {
+    fetch('/api/v1/job-templates', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, project_id: projectId, inventory_id: inventoryId, playbook })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.id) {
+          alert('Template Created Successfully!')
+          fetchTemplates()
+        } else {
+          alert('Failed to create template')
+        }
+      })
+  }
+
+  const handleUpdateTemplate = (id: number, name: string, projectId: number, inventoryId: number, playbook: string) => {
+    fetch(`/api/v1/job-templates/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, project_id: projectId, inventory_id: inventoryId, playbook })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.id) {
+          alert('Template Updated Successfully!')
+          fetchTemplates()
+        } else {
+          alert('Failed to update template')
+        }
+      })
+      .catch(err => alert('Update Request Failed: ' + err))
+  }
+  const handleCreateInventory = (name: string) => {
+    fetch('/api/v1/inventories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, organization_id: 1 })
+    })
+      .then(res => res.json())
+      .then(data => {
+        fetchInventories()
+        setSelectedInventoryId(data.id)
+      })
+      .catch(err => console.error("Failed to create inventory", err))
+  }
+
+  const handleCreateHost = (name: string, vars: string) => {
+    if (!selectedInventoryId) return
+    let variables = {}
+    try {
+      if (vars) variables = JSON.parse(vars)
+    } catch {
+      alert('Invalid JSON for variables')
+      return
+    }
+    fetch(`/api/v1/inventories/${selectedInventoryId}/hosts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, variables })
+    })
+      .then(() => fetchHosts(selectedInventoryId))
+      .catch(err => console.error("Failed to create host", err))
+  }
+
+  const handleCreateGroup = (name: string) => {
+    if (!selectedInventoryId) return
+    fetch(`/api/v1/inventories/${selectedInventoryId}/groups`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    })
+      .then(() => fetchGroups(selectedInventoryId))
+      .catch(err => console.error("Failed to create group", err))
+  }
+
+  const handleAddHostToGroup = (hostId: number) => {
+    if (!selectedGroupId) return
+    fetch(`/api/v1/groups/${selectedGroupId}/hosts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ host_id: hostId })
+    })
+      .then(() => fetchGroupHosts(selectedGroupId))
+      .catch(err => console.error("Failed to add host to group", err))
+  }
+
+  const handleSelectInventory = (id: number | null) => {
+    setSelectedInventoryId(id)
+    if (id) {
+      fetchHosts(id)
+      fetchGroups(id)
+    } else {
+      setHosts([])
+      setGroups([])
+    }
+    setSelectedGroupId(null)
+  }
+
+  const handleSelectGroup = (id: number | null) => {
+    setSelectedGroupId(id)
+    if (id) fetchGroupHosts(id)
+    else setGroupHosts([])
+  }
+
+  // --- RENDER ---
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'dashboard':
+        return <DashboardPage jobs={jobs} />
+      case 'jobs':
+        return (
+          <JobsPage
+            jobs={jobs}
+            templates={templates}
+            logs={logs}
+            onLaunchJob={handleLaunchJob}
+            onViewLogs={setSelectedRunID}
+            onCloseLogs={() => setSelectedRunID(null)}
+            onRefreshJobs={fetchJobs}
+            selectedRunID={selectedRunID}
+          />
+        )
+      case 'projects':
+        return (
+          <ProjectsPage
+            projects={projects}
+            onCreateProject={handleCreateProject}
+            onSyncProject={handleSyncProject}
+          />
+        )
+      case 'templates':
+        return (
+          <TemplatesPage
+            templates={templates}
+            projects={projects}
+            inventories={inventories}
+            onCreateTemplate={handleCreateTemplate}
+            onUpdateTemplate={handleUpdateTemplate}
+          />
+        )
+      case 'inventories':
+        return (
+          <InventoriesPage
+            inventories={inventories}
+            hosts={hosts}
+            groups={groups}
+            groupHosts={groupHosts}
+            selectedInventoryId={selectedInventoryId}
+            selectedGroupId={selectedGroupId}
+            onSelectInventory={handleSelectInventory}
+            onSelectGroup={handleSelectGroup}
+            onCreateInventory={handleCreateInventory}
+            onCreateHost={handleCreateHost}
+            onCreateGroup={handleCreateGroup}
+            onAddHostToGroup={handleAddHostToGroup}
+          />
+        )
+      default:
+        return <div style={{ color: 'white' }}>Page Not Found</div>
+    }
+  }
+
   return (
-    <div className="container">
-      <h1>Praetor Automation</h1>
-
-      <div className="tabs">
-        <button className={activeTab === 'jobs' ? 'active' : ''} onClick={() => setActiveTab('jobs')}>Jobs</button>
-        <button className={activeTab === 'templates' ? 'active' : ''} onClick={() => setActiveTab('templates')}>Templates</button>
-        <button className={activeTab === 'projects' ? 'active' : ''} onClick={() => setActiveTab('projects')}>Projects</button>
-      </div>
-
-      {activeTab === 'jobs' && (
-        <>
-          <div className="card launch-card">
-            <select
-              value={selectedTemplateId || ''}
-              onChange={(e) => setSelectedTemplateId(e.target.value ? parseInt(e.target.value) : null)}
-            >
-              <option value="">Use Default Playbook</option>
-              {templates.map(t => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-            <button onClick={launchJob}>Launch Job</button>
-          </div>
-
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Name</th>
-                <th>Status</th>
-                <th>Time</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {jobs.map(job => (
-                <tr key={job.id}>
-                  <td>{job.id}</td>
-                  <td>{job.name}</td>
-                  <td className={`status-${job.status}`}>{job.status}</td>
-                  <td>{new Date(job.created_at).toLocaleString()}</td>
-                  <td>
-                    {job.current_run_id && (
-                      <button onClick={() => setSelectedRunID(job.current_run_id!)}>
-                        View Logs
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </>
-      )}
-
-      {activeTab === 'templates' && (
-        <>
-          <div className="card template-form">
-            <h3>Create Job Template</h3>
-            <input
-              placeholder="Template Name"
-              value={newTemplateName}
-              onChange={e => setNewTemplateName(e.target.value)}
-            />
-            <select
-              value={newTemplateProjectId || ''}
-              onChange={e => setNewTemplateProjectId(e.target.value ? parseInt(e.target.value) : null)}
-            >
-              <option value="">Select Project...</option>
-              {projects.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-            <input
-              placeholder="Playbook path (e.g., playbook.yml)"
-              value={newTemplatePlaybook}
-              onChange={e => setNewTemplatePlaybook(e.target.value)}
-            />
-            <button onClick={createTemplate}>Create Template</button>
-          </div>
-
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Name</th>
-                <th>Playbook</th>
-              </tr>
-            </thead>
-            <tbody>
-              {templates.map(t => (
-                <tr key={t.id}>
-                  <td>{t.id}</td>
-                  <td>{t.name}</td>
-                  <td>{t.playbook || 'playbook.yml'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </>
-      )}
-
-      {activeTab === 'projects' && (
-        <>
-          <div className="card form-card">
-            <h3>Add Project</h3>
-            <input
-              placeholder="Project Name"
-              value={newProjectName}
-              onChange={e => setNewProjectName(e.target.value)}
-            />
-            <input
-              placeholder="Git URL"
-              value={newProjectURL}
-              onChange={e => setNewProjectURL(e.target.value)}
-            />
-            <button onClick={createProject}>Add</button>
-          </div>
-
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Name</th>
-                <th>SCM URL</th>
-                <th>Type</th>
-              </tr>
-            </thead>
-            <tbody>
-              {projects.map(proj => (
-                <tr key={proj.id}>
-                  <td>{proj.id}</td>
-                  <td>{proj.name}</td>
-                  <td>{proj.scm_url}</td>
-                  <td>{proj.scm_type}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </>
-      )}
-
-      {selectedRunID && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <div className="modal-header">
-              <h2>Execution Logs</h2>
-              <button onClick={() => setSelectedRunID(null)}>Close</button>
-            </div>
-            <div className="logs-container terminal">
-              <div className="terminal-output">
-                {logs
-                  .filter(log => log.stdout_snippet)
-                  .map((log, idx) => {
-                    const line = log.stdout_snippet;
-                    let className = 'log-line-default';
-                    if (line.startsWith('ok:') || line.includes('"changed": false')) {
-                      className = 'log-line-ok';
-                    } else if (line.startsWith('changed:') || line.includes('"changed": true')) {
-                      className = 'log-line-changed';
-                    } else if (line.startsWith('fatal:') || line.startsWith('failed:') || line.includes('FAILED')) {
-                      className = 'log-line-failed';
-                    } else if (line.includes('PLAY [') || line.includes('TASK [') || line.includes('PLAY RECAP')) {
-                      className = 'log-line-header';
-                    }
-                    return <pre key={idx} className={className}>{line}</pre>;
-                  })}
-              </div>
-              {logs.length === 0 && <p className="no-logs">Waiting for logs...</p>}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    <Layout
+      sidebar={
+        <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+      }
+    >
+      {renderContent()}
+    </Layout>
   )
 }
 

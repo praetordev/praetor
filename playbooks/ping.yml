@@ -1,0 +1,12 @@
+---
+- name: Ping All Hosts
+  hosts: all
+  gather_facts: no
+  
+  tasks:
+    - name: Ping
+      ping:
+      
+    - name: Say Hello
+      debug:
+        msg: "Hello from {{ inventory_hostname }}!"

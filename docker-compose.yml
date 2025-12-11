@@ -75,6 +75,9 @@ services:
       dockerfile: build/package/Dockerfile.executor
     environment:
       NATS_URL: nats://nats:4222
+      EXECUTOR_WORKERS: 2
+      ANSIBLE_FORKS: 1
+    shm_size: 1gb
     volumes:
       - ./keys/id_rsa:/home/praetor/.ssh/id_rsa:ro
     depends_on:
@@ -92,6 +95,8 @@ services:
       - ./keys:/tmp/keys:ro
     networks:
       - praetor-net
+    ports:
+      - "8081:80"
 
   web2:
     image: alpine:3.19
@@ -101,6 +106,8 @@ services:
       - ./keys:/tmp/keys:ro
     networks:
       - praetor-net
+    ports:
+      - "8082:80"
 
   db1:
     image: alpine:3.19

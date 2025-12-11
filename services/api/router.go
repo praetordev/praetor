@@ -55,12 +55,29 @@ func NewRouter(db *sqlx.DB) *chi.Mux {
 
 		r.Get("/projects", content.ListProjects)
 		r.Post("/projects", content.CreateProject)
+		r.Post("/projects/{id}/sync", content.SyncProject)
 
 		jobs := handlers.NewJobsResource(db)
 		r.Mount("/jobs", jobs.Routes())
 
 		templates := handlers.NewTemplatesResource(db)
 		r.Mount("/job-templates", templates.Routes())
+
+		inventories := handlers.NewInventoriesResource(db)
+		r.Mount("/inventories", inventories.Routes())
+
+		// Nested hosts/groups under inventories
+		hosts := handlers.NewHostsResource(db)
+		groups := handlers.NewGroupsResource(db)
+
+		r.Route("/inventories/{inventoryId}", func(r chi.Router) {
+			r.Mount("/hosts", hosts.Routes())
+			r.Mount("/groups", groups.Routes())
+		})
+
+		// Direct access to hosts and groups by ID
+		r.Mount("/hosts", hosts.HostRoutes())
+		r.Mount("/groups", groups.GroupRoutes())
 	})
 
 	return r

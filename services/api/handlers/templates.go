@@ -78,9 +78,10 @@ func (rs *TemplatesResource) CreateTemplate(w http.ResponseWriter, r *http.Reque
 		input.OrganizationID = 1
 	}
 
-	// Default playbook name if using inline content
-	if input.Playbook == "" {
-		input.Playbook = "playbook.yml"
+	// Validation: Playbook is required if no content provided
+	if input.Playbook == "" && input.PlaybookContent == nil {
+		render.ErrInvalidRequest(nil).Render(w, r)
+		return
 	}
 
 	// Default job type
@@ -89,14 +90,14 @@ func (rs *TemplatesResource) CreateTemplate(w http.ResponseWriter, r *http.Reque
 	}
 
 	query := `
-		INSERT INTO job_templates (organization_id, name, description, playbook, playbook_content, project_id, job_type, verbosity) 
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+		INSERT INTO job_templates (organization_id, name, description, playbook, playbook_content, project_id, inventory_id, job_type, verbosity) 
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
 		RETURNING *`
 
 	var created models.JobTemplate
 	err := rs.DB.QueryRowxContext(r.Context(), query,
 		input.OrganizationID, input.Name, input.Description,
-		input.Playbook, input.PlaybookContent, input.ProjectID,
+		input.Playbook, input.PlaybookContent, input.ProjectID, input.InventoryID,
 		input.JobType, input.Verbosity,
 	).StructScan(&created)
 
@@ -146,14 +147,14 @@ func (rs *TemplatesResource) UpdateTemplate(w http.ResponseWriter, r *http.Reque
 	query := `
 		UPDATE job_templates 
 		SET name = $2, description = $3, playbook = $4, playbook_content = $5, 
-		    project_id = $6, verbosity = $7, modified_at = now()
+		    project_id = $6, verbosity = $7, inventory_id = $8, modified_at = now()
 		WHERE id = $1 
 		RETURNING *`
 
 	var updated models.JobTemplate
 	err = rs.DB.QueryRowxContext(r.Context(), query,
 		id, input.Name, input.Description, input.Playbook,
-		input.PlaybookContent, input.ProjectID, input.Verbosity,
+		input.PlaybookContent, input.ProjectID, input.Verbosity, input.InventoryID,
 	).StructScan(&updated)
 
 	if err != nil {

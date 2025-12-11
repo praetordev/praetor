@@ -1,0 +1,72 @@
+# Praetor Backend
+
+Praetor is a Kubernetes-native automation platform designed as a resilient, scalable, and API-compatible alternative to Ansible Tower/AWX.
+
+## Architecture
+
+Praetor consists of decoupled microservices communicating via a PostgreSQL database:
+
+1.  **API Service**: REST API (`/api/v1`) for User/UI interaction.
+2.  **Scheduler Service**: Polling service that transitions `pending` Jobs to `ExecutionRuns`.
+3.  **Controller Service**: Kubernetes Operator-like service that watches `ExecutionRuns` and launches K8s Jobs.
+4.  **Ingestion Service**: High-throughput endpoint (`/api/v1/runs/{id}/events`) for receiving Ansible log streams.
+
+## Directory Structure
+
+- `cmd/`: Entrypoints for each service.
+- `pkg/`: Shared libraries (`models`, `db`).
+- `services/`: Service-specific logic (`api`, `scheduler`, `controller`, `ingestion`).
+- `db/migrations/`: SQL migration files.
+- `docs/`: Project documentation and OpenAPI specs.
+
+## Getting Started
+
+### Prerequisites
+
+- Go 1.25+
+- PostgreSQL 13+
+- Kubernetes Cluster (Minikube, Kind, or remote) - *Optional for API/Scheduler dev*
+- `migrate` CLI tool (golang-migrate)
+
+### Installation
+
+1.  Clone the repository.
+2.  Initialize the database:
+    ```bash
+    createdb praetor
+    make migrate-up
+    ```
+3.  Build all services:
+    ```bash
+    make build
+    ```
+
+### Running Services
+
+Run each service in a separate terminal:
+
+```bash
+# Terminal 1: API
+make run-api
+
+# Terminal 2: Scheduler
+make run-scheduler
+
+# Terminal 3: Controller (Requires KUBECONFIG)
+make run-controller
+
+# Terminal 4: Ingestion
+make run-ingestion
+```
+
+### Verification
+
+Check API health:
+```bash
+curl http://localhost:8080/api/v1/ping
+```
+
+Run integration tests:
+```bash
+make test
+```

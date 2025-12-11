@@ -21,5 +21,15 @@ fi
 # Ensure ownership is correct
 chown -R praetor:praetor /home/praetor/.ssh
 
+# Configure SSH to be permissive (Fixes invalid host key prompts)
+cat <<EOF > /home/praetor/.ssh/config
+Host *
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
+    LogLevel ERROR
+EOF
+chmod 600 /home/praetor/.ssh/config
+chown praetor:praetor /home/praetor/.ssh/config
+
 # Drop privileges and exec
 exec gosu praetor "$@"

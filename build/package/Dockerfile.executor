@@ -36,11 +36,25 @@ COPY --from=builder /praetor-executor /praetor-executor
 
 # Create a non-root user
 RUN useradd -m -u 1000 praetor
-USER praetor
+RUN mkdir -p /home/praetor/.ssh && chown -R praetor:praetor /home/praetor/.ssh && chmod 700 /home/praetor/.ssh
+
 ENV HOME=/home/praetor
 
 # Install Ansible collections as the runtime user
 # Ensure ~/.local/bin is in PATH if needed, though collections go to ~/.ansible
-RUN ansible-galaxy collection install ansible.posix community.general community.mysql
+# NOTE: We install as root, but they need to be accessible.
+# Actually, installing collections as root puts them in /root/.ansible/ usually.
+# We should switch user temporarily for ansible-galaxy or install to system location.
+# But simpler: Install gosu, then copy script.
+RUN apt-get update && apt-get install -y --no-install-recommends gosu && rm -rf /var/lib/apt/lists/*
 
+COPY build/package/executor_entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Install collections as praetor user to ensure they are in ~/.ansible
+USER praetor
+RUN ansible-galaxy collection install ansible.posix community.general community.mysql
+USER root
+
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["/praetor-executor"]

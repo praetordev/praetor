@@ -79,7 +79,7 @@ services:
       ANSIBLE_FORKS: 1
     shm_size: 1gb
     volumes:
-      - ./keys/id_rsa:/home/praetor/.ssh/id_rsa:ro
+      - ./keys:/tmp/keys:ro
     depends_on:
       nats:
         condition: service_started

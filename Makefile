@@ -56,14 +56,12 @@ KEYS_DIR=keys
 SSH_KEY=$(KEYS_DIR)/id_rsa
 
 gen-keys:
-	@echo "Checking SSH keys..."
+	@echo "Ensuring SSH keys..."
 	@mkdir -p $(KEYS_DIR)
 	@chmod 700 $(KEYS_DIR)
 	@if [ ! -f $(SSH_KEY) ]; then \
-		echo "Generating SSH keys..."; \
-		ssh-keygen -t rsa -b 4096 -f $(SSH_KEY) -N "" -C "praetor-internal"; \
-	else \
-		echo "SSH keys already exist."; \
+		echo "Generating new SSH keys..."; \
+		ssh-keygen -t rsa -b 4096 -f $(SSH_KEY) -N "" -C "praetor-internal" || exit 1; \
 	fi
 	@chmod 600 $(SSH_KEY)
 	@chmod 644 $(SSH_KEY).pub

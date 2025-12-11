@@ -231,6 +231,24 @@ function App() {
       .catch(err => console.error("Failed to create host", err))
   }
 
+  const handleDeleteHost = (hostId: number) => {
+    if (!selectedInventoryId) return
+    if (!confirm('Are you sure you want to delete this host?')) return
+
+    fetch(`/api/v1/hosts/${hostId}`, {
+      method: 'DELETE',
+    })
+      .then(res => {
+        if (res.ok) {
+          fetchHosts(selectedInventoryId)
+        } else {
+          console.error("Failed to delete host")
+          alert("Failed to delete host")
+        }
+      })
+      .catch(err => console.error("Failed to delete host", err))
+  }
+
   const handleCreateGroup = (name: string) => {
     if (!selectedInventoryId) return
     fetch(`/api/v1/inventories/${selectedInventoryId}/groups`, {
@@ -323,6 +341,7 @@ function App() {
             onCreateHost={handleCreateHost}
             onCreateGroup={handleCreateGroup}
             onAddHostToGroup={handleAddHostToGroup}
+            onDeleteHost={handleDeleteHost}
           />
         )
       default:

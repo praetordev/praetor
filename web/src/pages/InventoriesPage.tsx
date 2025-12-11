@@ -15,6 +15,7 @@ interface InventoriesPageProps {
     onCreateHost: (name: string, vars: string) => void;
     onCreateGroup: (name: string) => void;
     onAddHostToGroup: (hostId: number) => void;
+    onDeleteHost: (hostId: number) => void;
 }
 
 const InventoriesPage: React.FC<InventoriesPageProps> = ({
@@ -29,7 +30,8 @@ const InventoriesPage: React.FC<InventoriesPageProps> = ({
     onCreateInventory,
     onCreateHost,
     onCreateGroup,
-    onAddHostToGroup
+    onAddHostToGroup,
+    onDeleteHost
 }) => {
     const [newInvName, setNewInvName] = useState('');
     const [newHostName, setNewHostName] = useState('');
@@ -121,6 +123,7 @@ const InventoriesPage: React.FC<InventoriesPageProps> = ({
                                         <th>ID</th>
                                         <th>Name</th>
                                         <th>Enabled</th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -129,6 +132,15 @@ const InventoriesPage: React.FC<InventoriesPageProps> = ({
                                             <td>{h.id}</td>
                                             <td>{h.name}</td>
                                             <td style={{ color: h.enabled ? '#4ade80' : '#666' }}>{h.enabled ? 'Active' : 'Disabled'}</td>
+                                            <td>
+                                                <button
+                                                    className="action-btn-sm"
+                                                    style={{ backgroundColor: '#ef4444', color: 'white' }}
+                                                    onClick={() => onDeleteHost(h.id)}
+                                                >
+                                                    Delete
+                                                </button>
+                                            </td>
                                         </tr>
                                     ))}
                                     {hosts.length === 0 && <tr><td colSpan={3} style={{ textAlign: 'center' }}>No hosts</td></tr>}

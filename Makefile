@@ -24,6 +24,7 @@ test:
 
 clean:
 	rm -rf $(BINARY_DIR)
+	rm -rf $(KEYS_DIR)
 
 # Database
 DB_URL ?= postgres://postgres:postgres@localhost:5432/praetor?sslmode=disable
@@ -57,12 +58,15 @@ SSH_KEY=$(KEYS_DIR)/id_rsa
 gen-keys:
 	@echo "Checking SSH keys..."
 	@mkdir -p $(KEYS_DIR)
+	@chmod 700 $(KEYS_DIR)
 	@if [ ! -f $(SSH_KEY) ]; then \
 		echo "Generating SSH keys..."; \
 		ssh-keygen -t rsa -b 4096 -f $(SSH_KEY) -N "" -C "praetor-internal"; \
 	else \
 		echo "SSH keys already exist."; \
 	fi
+	@chmod 600 $(SSH_KEY)
+	@chmod 644 $(SSH_KEY).pub
 
 up: gen-keys
 	@echo "Starting full stack with Docker Compose..."

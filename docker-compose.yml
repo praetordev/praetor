@@ -90,7 +90,8 @@ services:
   web1:
     image: alpine:3.19
     hostname: web1
-    command: /bin/sh -c "apk add --no-cache openssh python3 && ssh-keygen -A && mkdir -p /root/.ssh && chmod 700 /root/.ssh && cat /tmp/keys/id_rsa.pub > /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys && /usr/sbin/sshd -D"
+    command: >
+      /bin/sh -c "apk add --no-cache openssh python3 sudo && ssh-keygen -A && mkdir -p /root/.ssh && chmod 700 /root/.ssh && while [ ! -f /tmp/keys/id_rsa.pub ]; do echo 'Waiting for keys...'; sleep 1; done && cat /tmp/keys/id_rsa.pub > /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys && adduser -D praetor && echo 'praetor:praetor' | chpasswd && mkdir -p /home/praetor/.ssh && chmod 700 /home/praetor/.ssh && cat /tmp/keys/id_rsa.pub > /home/praetor/.ssh/authorized_keys && chmod 600 /home/praetor/.ssh/authorized_keys && chown -R praetor:praetor /home/praetor/.ssh && echo 'praetor ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers && /usr/sbin/sshd -D"
     volumes:
       - ./keys:/tmp/keys:ro
     networks:
@@ -101,7 +102,8 @@ services:
   web2:
     image: alpine:3.19
     hostname: web2
-    command: /bin/sh -c "apk add --no-cache openssh python3 && ssh-keygen -A && mkdir -p /root/.ssh && chmod 700 /root/.ssh && cat /tmp/keys/id_rsa.pub > /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys && /usr/sbin/sshd -D"
+    command: >
+      /bin/sh -c "apk add --no-cache openssh python3 sudo && ssh-keygen -A && mkdir -p /root/.ssh && chmod 700 /root/.ssh && while [ ! -f /tmp/keys/id_rsa.pub ]; do echo 'Waiting for keys...'; sleep 1; done && cat /tmp/keys/id_rsa.pub > /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys && adduser -D praetor && echo 'praetor:praetor' | chpasswd && mkdir -p /home/praetor/.ssh && chmod 700 /home/praetor/.ssh && cat /tmp/keys/id_rsa.pub > /home/praetor/.ssh/authorized_keys && chmod 600 /home/praetor/.ssh/authorized_keys && chown -R praetor:praetor /home/praetor/.ssh && echo 'praetor ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers && /usr/sbin/sshd -D"
     volumes:
       - ./keys:/tmp/keys:ro
     networks:
@@ -112,7 +114,8 @@ services:
   db1:
     image: alpine:3.19
     hostname: db1
-    command: /bin/sh -c "apk add --no-cache openssh python3 && ssh-keygen -A && mkdir -p /root/.ssh && chmod 700 /root/.ssh && cat /tmp/keys/id_rsa.pub > /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys && /usr/sbin/sshd -D"
+    command: >
+      /bin/sh -c "apk add --no-cache openssh python3 sudo && ssh-keygen -A && mkdir -p /root/.ssh && chmod 700 /root/.ssh && while [ ! -f /tmp/keys/id_rsa.pub ]; do echo 'Waiting for keys...'; sleep 1; done && cat /tmp/keys/id_rsa.pub > /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys && adduser -D praetor && echo 'praetor:praetor' | chpasswd && mkdir -p /home/praetor/.ssh && chmod 700 /home/praetor/.ssh && cat /tmp/keys/id_rsa.pub > /home/praetor/.ssh/authorized_keys && chmod 600 /home/praetor/.ssh/authorized_keys && chown -R praetor:praetor /home/praetor/.ssh && echo 'praetor ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers && /usr/sbin/sshd -D"
     volumes:
       - ./keys:/tmp/keys:ro
     networks:
@@ -122,7 +125,8 @@ services:
   target-host:
     image: alpine:3.19
     hostname: target-host
-    command: /bin/sh -c "apk add --no-cache openssh python3 && ssh-keygen -A && mkdir -p /root/.ssh && chmod 700 /root/.ssh && cat /tmp/keys/id_rsa.pub > /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys && /usr/sbin/sshd -D"
+    command: >
+      /bin/sh -c "apk add --no-cache openssh python3 sudo && ssh-keygen -A && mkdir -p /root/.ssh && chmod 700 /root/.ssh && while [ ! -f /tmp/keys/id_rsa.pub ]; do echo 'Waiting for keys...'; sleep 1; done && cat /tmp/keys/id_rsa.pub > /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys && adduser -D praetor && echo 'praetor:praetor' | chpasswd && mkdir -p /home/praetor/.ssh && chmod 700 /home/praetor/.ssh && cat /tmp/keys/id_rsa.pub > /home/praetor/.ssh/authorized_keys && chmod 600 /home/praetor/.ssh/authorized_keys && chown -R praetor:praetor /home/praetor/.ssh && echo 'praetor ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers && /usr/sbin/sshd -D"
     volumes:
       - ./keys:/tmp/keys:ro
     networks:

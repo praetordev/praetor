@@ -31,5 +31,16 @@ EOF
 chmod 600 /home/praetor/.ssh/config
 chown praetor:praetor /home/praetor/.ssh/config
 
+# DEBUGGING SUPPORT: Enable root to use the keys too
+# This fixes "docker compose exec executor ssh ..." running as root
+mkdir -p /root/.ssh
+cp /home/praetor/.ssh/id_rsa /root/.ssh/id_rsa
+cp /home/praetor/.ssh/id_rsa.pub /root/.ssh/id_rsa.pub
+cp /home/praetor/.ssh/config /root/.ssh/config
+chmod 700 /root/.ssh
+chmod 600 /root/.ssh/id_rsa
+chmod 644 /root/.ssh/id_rsa.pub
+chmod 600 /root/.ssh/config
+
 # Drop privileges and exec
 exec gosu praetor "$@"

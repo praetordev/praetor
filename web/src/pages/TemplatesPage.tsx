@@ -24,6 +24,11 @@ const TemplatesPage: React.FC<TemplatesPageProps> = ({
     const [playbook, setPlaybook] = useState('');
 
     const handleSave = () => {
+        if (!name || !projectId || !inventoryId || !playbook) {
+            alert("Please fill in all fields: Name, Playbook, Project, and Inventory.");
+            return;
+        }
+
         if (name && projectId && inventoryId && playbook) {
             if (id) {
                 onUpdateTemplate(id, name, projectId, inventoryId, playbook);

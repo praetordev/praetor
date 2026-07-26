@@ -331,6 +331,21 @@ func TestProductValidationFixtureHasCleanEnvironmentGate(t *testing.T) {
 			t.Fatalf("LDAP operator journey must contain %q", required)
 		}
 	}
+	fleetLiveRaw, err := os.ReadFile(filepath.Join(root, "scripts", "validate-fleet-scale-live.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fleetLive := string(fleetLiveRaw)
+	for _, required := range []string{
+		`change_ticket:"CHG-FLEET-E2E"`,
+		`deployment_ring:"canary"`,
+		`approval_secret:"fleet-validation-only"`,
+		`[.results[].status] == ["accepted","rejected"]`,
+	} {
+		if !strings.Contains(fleetLive, required) {
+			t.Fatalf("fleet-scale live journey must contain %q", required)
+		}
+	}
 	bootstrapRaw, err := os.ReadFile(filepath.Join(root, "scripts", "bootstrap-product-validation-base.sh"))
 	if err != nil {
 		t.Fatal(err)

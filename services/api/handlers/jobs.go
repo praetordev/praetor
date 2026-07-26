@@ -156,6 +156,12 @@ func (rs *JobsResource) renderInternalError(w http.ResponseWriter, r *http.Reque
 	}
 }
 
+func (rs *JobsResource) renderResponse(w http.ResponseWriter, r *http.Request, response render.Renderer) {
+	if err := render.Render(w, r, response); err != nil {
+		rs.log.Error("render jobs response", "err", err)
+	}
+}
+
 // LaunchJob creates a new unified job with status 'pending'
 // The Scheduler will pick this up, create an execution_run, and dispatch it.
 func (rs *JobsResource) LaunchJob(w http.ResponseWriter, r *http.Request) {
@@ -170,7 +176,7 @@ func (rs *JobsResource) LaunchJob(w http.ResponseWriter, r *http.Request) {
 	}
 	var req LaunchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		render.Render(w, r, ErrInvalidRequest(err))
+		rs.renderResponse(w, r, ErrInvalidRequest(err))
 		return
 	}
 
@@ -179,7 +185,7 @@ func (rs *JobsResource) LaunchJob(w http.ResponseWriter, r *http.Request) {
 	// owns the roles, and read its prompt-on-launch flags.
 	jt, err := rs.store.LaunchTemplateInfo(r.Context(), req.UnifiedJobTemplateID)
 	if err != nil {
-		render.Render(w, r, ErrInvalidRequest(fmt.Errorf("unknown job template")))
+		rs.renderResponse(w, r, ErrInvalidRequest(fmt.Errorf("unknown job template")))
 		return
 	}
 	if !rs.authorize(w, r, rbac.JobTemplate, jt.ID, actExecute) {
@@ -187,13 +193,13 @@ func (rs *JobsResource) LaunchJob(w http.ResponseWriter, r *http.Request) {
 	}
 	template, err := store.NewTemplateStore(rs.DB).Get(r.Context(), jt.ID)
 	if err != nil {
-		render.Render(w, r, ErrInternal(err))
+		rs.renderResponse(w, r, ErrInternal(err))
 		return
 	}
 	if req.RelaunchSourceJobID != nil {
 		source, err := rs.store.JobCancelInfo(r.Context(), *req.RelaunchSourceJobID)
 		if err != nil || source.UnifiedJobTemplateID == nil || *source.UnifiedJobTemplateID != req.UnifiedJobTemplateID {
-			render.Render(w, r, ErrInvalidRequest(fmt.Errorf("relaunch source must belong to the same job template")))
+			rs.renderResponse(w, r, ErrInvalidRequest(fmt.Errorf("relaunch source must belong to the same job template")))
 			return
 		}
 	}
@@ -207,11 +213,11 @@ func (rs *JobsResource) LaunchJob(w http.ResponseWriter, r *http.Request) {
 		Limit:     req.Limit,
 	})
 	if errors.Is(err, errLaunchResourceUnavailable) {
-		render.Render(w, r, ErrForbidden)
+		rs.renderResponse(w, r, ErrForbidden)
 		return
 	}
 	if err != nil {
-		render.Render(w, r, ErrInvalidRequest(err))
+		rs.renderResponse(w, r, ErrInvalidRequest(err))
 		return
 	}
 
@@ -220,7 +226,7 @@ func (rs *JobsResource) LaunchJob(w http.ResponseWriter, r *http.Request) {
 	// accidental double-triggers from queuing a second overlapping run.
 	if !jt.AllowSimultaneous {
 		if active, err := rs.store.ActiveJobCount(r.Context(), req.UnifiedJobTemplateID); err == nil && active > 0 {
-			render.Render(w, r, ErrConflict(fmt.Errorf("a run of this job template is already active; wait for it to finish or enable Allow Simultaneous")))
+			rs.renderResponse(w, r, ErrConflict(fmt.Errorf("a run of this job template is already active; wait for it to finish or enable Allow Simultaneous")))
 			return
 		}
 	}
@@ -242,15 +248,15 @@ func (rs *JobsResource) LaunchJob(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// Lost the race to a concurrent launch of a non-simultaneous template.
 		if isActiveRunConflict(err) {
-			render.Render(w, r, ErrConflict(fmt.Errorf("a run of this job template is already active; wait for it to finish or enable Allow Simultaneous")))
+			rs.renderResponse(w, r, ErrConflict(fmt.Errorf("a run of this job template is already active; wait for it to finish or enable Allow Simultaneous")))
 			return
 		}
-		render.Render(w, r, ErrInternal(err))
+		rs.renderResponse(w, r, ErrInternal(err))
 		return
 	}
 	if req.RelaunchSourceJobID != nil {
 		if err := rs.store.SetRelaunchSource(r.Context(), jobID, *req.RelaunchSourceJobID, req.UnifiedJobTemplateID); err != nil {
-			render.Render(w, r, ErrInternal(err))
+			rs.renderResponse(w, r, ErrInternal(err))
 			return
 		}
 	}

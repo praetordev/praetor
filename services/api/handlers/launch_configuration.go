@@ -52,6 +52,10 @@ type launchInputResolver struct {
 	*Authorizer
 }
 
+type launchErrorRenderer interface {
+	Render(http.ResponseWriter, *http.Request) error
+}
+
 type launchPreview struct {
 	Template struct {
 		ID                   int64  `json:"id"`
@@ -78,12 +82,12 @@ func (rs *TemplatesResource) GetLaunchConfiguration(w http.ResponseWriter, r *ht
 
 	inventories, err := rs.launchInventories(r, template.OrganizationID)
 	if err != nil {
-		render.ErrInternal(err).Render(w, r)
+		renderLaunchError(w, r, render.ErrInternal(err))
 		return
 	}
 	credentials, err := rs.launchCredentials(r, template.OrganizationID)
 	if err != nil {
-		render.ErrInternal(err).Render(w, r)
+		renderLaunchError(w, r, render.ErrInternal(err))
 		return
 	}
 
@@ -123,17 +127,17 @@ func (rs *TemplatesResource) PreviewLaunch(w http.ResponseWriter, r *http.Reques
 	}
 	var input launchPromptInput
 	if err := decodeStrictJSON(r, &input); err != nil {
-		render.ErrInvalidRequest(err).Render(w, r)
+		renderLaunchError(w, r, render.ErrInvalidRequest(err))
 		return
 	}
 	preview, err := rs.launchResolver().preview(r, template, input)
 	if errors.Is(err, errLaunchResourceUnavailable) {
 		// Do not distinguish a missing, cross-org, or unauthorized resource.
-		render.ErrForbidden(nil).Render(w, r)
+		renderLaunchError(w, r, render.ErrForbidden(nil))
 		return
 	}
 	if err != nil {
-		render.ErrInvalidRequest(err).Render(w, r)
+		renderLaunchError(w, r, render.ErrInvalidRequest(err))
 		return
 	}
 	render.JSON(w, r, preview)
@@ -143,10 +147,16 @@ func (rs *TemplatesResource) launchResolver() launchInputResolver {
 	return launchInputResolver{DB: rs.DB, Authorizer: rs.Authorizer}
 }
 
+func renderLaunchError(w http.ResponseWriter, r *http.Request, response launchErrorRenderer) {
+	if err := response.Render(w, r); err != nil {
+		logger.Error("render launch response", "err", err)
+	}
+}
+
 func (rs *TemplatesResource) launchableTemplate(w http.ResponseWriter, r *http.Request) (models.JobTemplate, bool) {
 	id, err := parseID(chi.URLParam(r, "id"))
 	if err != nil {
-		render.ErrInvalidRequest(err).Render(w, r)
+		renderLaunchError(w, r, render.ErrInvalidRequest(err))
 		return models.JobTemplate{}, false
 	}
 	if !rs.authorize(w, r, rbac.JobTemplate, id, actExecute) {
@@ -154,7 +164,7 @@ func (rs *TemplatesResource) launchableTemplate(w http.ResponseWriter, r *http.R
 	}
 	template, err := rs.store.Get(r.Context(), id)
 	if err != nil || template.UnifiedJobTemplateID == nil {
-		render.ErrNotFound(nil).Render(w, r)
+		renderLaunchError(w, r, render.ErrNotFound(nil))
 		return models.JobTemplate{}, false
 	}
 	return template, true

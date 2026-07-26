@@ -219,6 +219,7 @@ func TestProductValidationFixtureIsScopedAndIdempotent(t *testing.T) {
 		`DELETE FROM workflow_templates WHERE name = 'Praetor Validation Workflow'`,
 		`notification-policies?resource_type=`,
 		`ensure_policy workflow_template`,
+		`ask_limit_on_launch:true`,
 		`persistent platform data and secrets were preserved`,
 	} {
 		if !strings.Contains(script, required) {

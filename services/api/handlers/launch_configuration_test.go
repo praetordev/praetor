@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/praetordev/launch"
 	rbac "github.com/praetordev/praetor/pkg/accesscontrol"
 	"github.com/praetordev/praetor/services/api/handlers"
 	"github.com/praetordev/praetor/services/api/middleware"
@@ -18,6 +20,10 @@ func TestLaunchConfigurationFiltersResourcesAndPreviewsEffectiveInputs(t *testin
 	db := rbacTestDB(t)
 	defer db.Close()
 	resource := handlers.NewTemplatesResource(db, handlers.NewAuthorizer(db))
+	jobs, err := handlers.NewJobsResource(db, "", "", handlers.NewAuthorizer(db))
+	if err != nil {
+		t.Fatal(err)
+	}
 	access := rbac.NewStore(db, testResourceTables)
 
 	uniq := time.Now().UnixNano()
@@ -89,6 +95,7 @@ func TestLaunchConfigurationFiltersResourcesAndPreviewsEffectiveInputs(t *testin
 		t.Fatalf("created template prompt flags: %#v err=%v body=%s", created, err, rec.Body)
 	}
 	t.Cleanup(func() {
+		_, _ = db.Exec(`DELETE FROM unified_jobs WHERE unified_job_template_id=$1`, created.UnifiedJobTemplateID)
 		_, _ = db.Exec(`DELETE FROM organizations WHERE id IN ($1,$2)`, orgID, otherOrgID)
 		_, _ = db.Exec(`DELETE FROM unified_job_templates WHERE id=$1`, created.UnifiedJobTemplateID)
 		_, _ = db.Exec(`DELETE FROM users WHERE id=$1`, operatorID)
@@ -158,6 +165,77 @@ func TestLaunchConfigurationFiltersResourcesAndPreviewsEffectiveInputs(t *testin
 		t.Fatalf("unexpected launch preview: %#v", preview)
 	}
 
+	secretsID := uuid.New()
+	if _, err := db.Exec(`UPDATE credentials
+		SET secrets_service_id=$1, secrets_service_version=4 WHERE id=$2`,
+		secretsID, allowedCredentialID); err != nil {
+		t.Fatalf("bind test credential version: %v", err)
+	}
+	launchBody := fmt.Sprintf(`{
+		"unified_job_template_id":%d,
+		"name":"immutable-launch",
+		"inventory_id":%d,
+		"credential_id":%d,
+		"extra_vars":{"release":"canary"},
+		"limit":"app-*"
+	}`, created.UnifiedJobTemplateID, allowedInventoryID, allowedCredentialID)
+	rec = callJSON(t, jobs.LaunchJob, http.MethodPost, launchBody, operator, nil)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("launch authorized snapshot: want 201, got %d (%s)", rec.Code, rec.Body)
+	}
+	sourceJobID := extractID(t, rec.Body.String())
+	var storedArgs json.RawMessage
+	if err := db.Get(&storedArgs, `SELECT job_args FROM unified_jobs WHERE id=$1`, sourceJobID); err != nil {
+		t.Fatalf("read immutable launch args: %v", err)
+	}
+	snapshot := launch.ParseArgs(storedArgs)
+	if !snapshot.HasResolvedInputs() ||
+		snapshot.InventoryID == nil || *snapshot.InventoryID != allowedInventoryID ||
+		snapshot.CredentialID == nil || *snapshot.CredentialID != allowedCredentialID ||
+		snapshot.SecretsCredentialID != secretsID.String() ||
+		snapshot.SecretsCredentialVersion != 4 ||
+		snapshot.ExtraVars["saved"] != "value" || snapshot.ExtraVars["release"] != "canary" ||
+		snapshot.Limit == nil || *snapshot.Limit != "app-*" {
+		t.Fatalf("stored launch snapshot = %#v", snapshot)
+	}
+	if !snapshot.PromptedInventory || !snapshot.PromptedCredential ||
+		snapshot.PromptedExtraVars["release"] != "canary" ||
+		snapshot.PromptedLimit == nil || *snapshot.PromptedLimit != "app-*" {
+		t.Fatalf("stored prompt answers = %#v", snapshot)
+	}
+
+	// A subsequent template edit cannot mutate the accepted source snapshot.
+	// Relaunch restores only the original prompt answers and resolves them under
+	// the current prompt policy/defaults.
+	if _, err := db.Exec(`UPDATE unified_jobs SET status='successful' WHERE id=$1`, sourceJobID); err != nil {
+		t.Fatalf("finish source job: %v", err)
+	}
+	if _, err := db.Exec(`UPDATE job_templates
+		SET extra_vars='{"saved":"changed"}', job_limit='changed-*' WHERE id=$1`, created.ID); err != nil {
+		t.Fatalf("edit template after launch: %v", err)
+	}
+	rec = callJSON(t, jobs.LaunchJob, http.MethodPost,
+		fmt.Sprintf(`{"unified_job_template_id":%d,"name":"relaunch","relaunch_source_job_id":%d}`,
+			created.UnifiedJobTemplateID, sourceJobID), operator, nil)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("relaunch immutable choices: want 201, got %d (%s)", rec.Code, rec.Body)
+	}
+	relaunchID := extractID(t, rec.Body.String())
+	var relaunchedArgs json.RawMessage
+	if err := db.Get(&relaunchedArgs, `SELECT job_args FROM unified_jobs WHERE id=$1`, relaunchID); err != nil {
+		t.Fatalf("read relaunch args: %v", err)
+	}
+	relaunched := launch.ParseArgs(relaunchedArgs)
+	if relaunched.ExtraVars["saved"] != "changed" || relaunched.ExtraVars["release"] != "canary" ||
+		relaunched.InventoryID == nil || *relaunched.InventoryID != allowedInventoryID ||
+		relaunched.SecretsCredentialVersion != 4 {
+		t.Fatalf("relaunch snapshot = %#v", relaunched)
+	}
+	original := launch.ParseArgs(storedArgs)
+	if original.ExtraVars["saved"] != "value" || original.Limit == nil || *original.Limit != "app-*" {
+		t.Fatalf("source snapshot changed after template edit: %#v", original)
+	}
+
 	inventoryUseName, _ := rbac.BuiltinRoleName(rbac.Inventory, rbac.UseRole)
 	inventoryUse, err := access.RoleByName(context.Background(), inventoryUseName)
 	if err != nil {
@@ -176,6 +254,12 @@ func TestLaunchConfigurationFiltersResourcesAndPreviewsEffectiveInputs(t *testin
 	rec = callJSON(t, resource.PreviewLaunch, http.MethodPost, previewBody, operator, params)
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("preview after use revocation: want 403, got %d (%s)", rec.Code, rec.Body)
+	}
+	rec = callJSON(t, jobs.LaunchJob, http.MethodPost,
+		fmt.Sprintf(`{"unified_job_template_id":%d,"inventory_id":%d}`,
+			created.UnifiedJobTemplateID, allowedInventoryID), operator, nil)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("launch after use revocation: want 403, got %d (%s)", rec.Code, rec.Body)
 	}
 	if err := access.Assign(context.Background(), inventoryAssignment); err != nil {
 		t.Fatalf("restore inventory use: %v", err)
@@ -202,6 +286,12 @@ func TestLaunchConfigurationFiltersResourcesAndPreviewsEffectiveInputs(t *testin
 		fmt.Sprintf(`{"inventory_id":%d}`, allowedInventoryID), operator, params)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("disabled inventory prompt: want 400, got %d (%s)", rec.Code, rec.Body)
+	}
+	rec = callJSON(t, jobs.LaunchJob, http.MethodPost,
+		fmt.Sprintf(`{"unified_job_template_id":%d,"inventory_id":%d}`,
+			created.UnifiedJobTemplateID, allowedInventoryID), operator, nil)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("launch with disabled inventory prompt: want 400, got %d (%s)", rec.Code, rec.Body)
 	}
 
 	if _, err := db.Exec(`UPDATE job_templates

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/praetordev/models"
 	rbac "github.com/praetordev/praetor/pkg/accesscontrol"
@@ -27,10 +28,12 @@ type launchInventoryRef struct {
 }
 
 type launchCredentialRef struct {
-	ID               int64  `db:"id" json:"id"`
-	Name             string `db:"name" json:"name"`
-	CredentialTypeID int64  `db:"credential_type_id" json:"credential_type_id"`
-	CredentialType   string `db:"credential_type" json:"credential_type"`
+	ID                    int64      `db:"id" json:"id"`
+	Name                  string     `db:"name" json:"name"`
+	CredentialTypeID      int64      `db:"credential_type_id" json:"credential_type_id"`
+	CredentialType        string     `db:"credential_type" json:"credential_type"`
+	SecretsServiceID      *uuid.UUID `db:"secrets_service_id" json:"-"`
+	SecretsServiceVersion *int64     `db:"secrets_service_version" json:"-"`
 }
 
 type launchPromptInput struct {
@@ -201,7 +204,8 @@ func (rs *TemplatesResource) launchCredentials(r *http.Request, organizationID i
 		return []launchCredentialRef{}, err
 	}
 	query, args, err := sqlx.In(`
-		SELECT c.id, c.name, c.credential_type_id, ct.name AS credential_type
+		SELECT c.id, c.name, c.credential_type_id, ct.name AS credential_type,
+		       c.secrets_service_id, c.secrets_service_version
 		FROM credentials c
 		JOIN credential_types ct ON ct.id = c.credential_type_id
 		WHERE c.organization_id = ? AND c.id IN (?) AND lower(ct.name) = 'machine'
@@ -338,7 +342,8 @@ func (rs launchInputResolver) resolveLaunchCredential(r *http.Request, organizat
 		return nil, errLaunchResourceUnavailable
 	}
 	query := `
-		SELECT c.id, c.name, c.credential_type_id, ct.name AS credential_type
+		SELECT c.id, c.name, c.credential_type_id, ct.name AS credential_type,
+		       c.secrets_service_id, c.secrets_service_version
 		FROM credentials c JOIN credential_types ct ON ct.id=c.credential_type_id
 		WHERE c.id=$1 AND c.organization_id=$2`
 	if requireMachine {

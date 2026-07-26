@@ -68,6 +68,7 @@ func TestFleetScaleLiveValidationUsesSyntheticBoundedResources(t *testing.T) {
 		`journey:"fleet-scale-live"`,
 		"PRAETOR_FLEET_LIVE_EVIDENCE_FILE",
 		"PRAETOR_FLEET_BOOTSTRAP_FIXTURE",
+		"ask_limit_on_launch:true",
 		"umask 077",
 	} {
 		if !strings.Contains(script, required) {

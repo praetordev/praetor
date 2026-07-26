@@ -232,6 +232,13 @@ func (a *Authorizer) readableIDs(r *http.Request, contentType accesscontrol.Reso
 	return a.authz.VisibleIDs(r.Context(), a.subject(r), accesscontrol.View, accesscontrol.ResourceKind(contentType))
 }
 
+// usableIDs returns object IDs the current user may attach to or consume from
+// another resource. It is deliberately distinct from readableIDs: being able to
+// see an inventory or credential does not grant permission to use it in a job.
+func (a *Authorizer) usableIDs(r *http.Request, contentType accesscontrol.ResourceKind) ([]int64, error) {
+	return a.authz.VisibleIDs(r.Context(), a.subject(r), accesscontrol.Use, accesscontrol.ResourceKind(contentType))
+}
+
 // canViewAll reports whether the current user may view every object of
 // contentType — a global view grant, held by break-glass superusers (via the
 // decorator) and any system role that grants view globally (e.g. System

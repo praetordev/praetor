@@ -53,6 +53,7 @@ GET     /api/v1/inventories/{inventoryId}/sources/{sourceId}/history
 GET     /api/v1/inventory-source-types
 GET     /api/v1/job-templates/
 GET     /api/v1/job-templates/{id}
+GET     /api/v1/job-templates/{id}/launch-configuration
 GET     /api/v1/job-templates/{id}/notifications
 GET     /api/v1/jobs/
 GET     /api/v1/jobs/runs/{runID}
@@ -133,6 +134,7 @@ POST    /api/v1/inventories/{inventoryId}/sources
 POST    /api/v1/inventories/{inventoryId}/sources/{sourceId}/preview
 POST    /api/v1/inventories/{inventoryId}/sources/{sourceId}/sync
 POST    /api/v1/job-templates/
+POST    /api/v1/job-templates/{id}/launch-preview
 POST    /api/v1/job-templates/{id}/notifications
 POST    /api/v1/jobs/
 POST    /api/v1/jobs/runs/{runID}/events

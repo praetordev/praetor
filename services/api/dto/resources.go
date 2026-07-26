@@ -236,64 +236,68 @@ func (d Credential) ToModel() models.Credential {
 
 // JobTemplate is the wire shape of a job template.
 type JobTemplate struct {
-	ID                   int64           `json:"id"`
-	OrganizationID       int64           `json:"organization_id"`
-	Name                 string          `json:"name"`
-	Description          *string         `json:"description,omitempty"`
-	InventoryID          *int64          `json:"inventory_id,omitempty"`
-	ProjectID            *int64          `json:"project_id,omitempty"`
-	Playbook             string          `json:"playbook"`
-	PlaybookContent      *string         `json:"playbook_content,omitempty"`
-	UnifiedJobTemplateID *int64          `json:"unified_job_template_id,omitempty"`
-	CredentialID         *int64          `json:"credential_id,omitempty"`
-	ExecutionPackID      *int64          `json:"execution_pack_id,omitempty"`
-	Forks                int             `json:"forks"`
-	JobType              string          `json:"job_type"`
-	Verbosity            int             `json:"verbosity"`
-	ExtraVars            json.RawMessage `json:"extra_vars,omitempty"`
-	JobLimit             string          `json:"limit"`
-	AskVariablesOnLaunch bool            `json:"ask_variables_on_launch"`
-	AskLimitOnLaunch     bool            `json:"ask_limit_on_launch"`
-	SurveyEnabled        bool            `json:"survey_enabled"`
-	SurveySpec           json.RawMessage `json:"survey_spec,omitempty"`
-	WebhookEnabled       bool            `json:"webhook_enabled"`
-	WebhookService       string          `json:"webhook_service"`
-	WebhookKey           string          `json:"webhook_key"`
-	UseFactCache         bool            `json:"use_fact_cache"`
-	AllowSimultaneous    bool            `json:"allow_simultaneous"`
-	CreatedAt            time.Time       `json:"created_at"`
-	ModifiedAt           time.Time       `json:"modified_at"`
+	ID                    int64           `json:"id"`
+	OrganizationID        int64           `json:"organization_id"`
+	Name                  string          `json:"name"`
+	Description           *string         `json:"description,omitempty"`
+	InventoryID           *int64          `json:"inventory_id,omitempty"`
+	ProjectID             *int64          `json:"project_id,omitempty"`
+	Playbook              string          `json:"playbook"`
+	PlaybookContent       *string         `json:"playbook_content,omitempty"`
+	UnifiedJobTemplateID  *int64          `json:"unified_job_template_id,omitempty"`
+	CredentialID          *int64          `json:"credential_id,omitempty"`
+	ExecutionPackID       *int64          `json:"execution_pack_id,omitempty"`
+	Forks                 int             `json:"forks"`
+	JobType               string          `json:"job_type"`
+	Verbosity             int             `json:"verbosity"`
+	ExtraVars             json.RawMessage `json:"extra_vars,omitempty"`
+	JobLimit              string          `json:"limit"`
+	AskVariablesOnLaunch  bool            `json:"ask_variables_on_launch"`
+	AskLimitOnLaunch      bool            `json:"ask_limit_on_launch"`
+	AskInventoryOnLaunch  bool            `json:"ask_inventory_on_launch"`
+	AskCredentialOnLaunch bool            `json:"ask_credential_on_launch"`
+	SurveyEnabled         bool            `json:"survey_enabled"`
+	SurveySpec            json.RawMessage `json:"survey_spec,omitempty"`
+	WebhookEnabled        bool            `json:"webhook_enabled"`
+	WebhookService        string          `json:"webhook_service"`
+	WebhookKey            string          `json:"webhook_key"`
+	UseFactCache          bool            `json:"use_fact_cache"`
+	AllowSimultaneous     bool            `json:"allow_simultaneous"`
+	CreatedAt             time.Time       `json:"created_at"`
+	ModifiedAt            time.Time       `json:"modified_at"`
 }
 
 func FromJobTemplate(m models.JobTemplate) JobTemplate {
 	return JobTemplate{
-		ID:                   m.ID,
-		OrganizationID:       m.OrganizationID,
-		Name:                 m.Name,
-		Description:          m.Description,
-		InventoryID:          m.InventoryID,
-		ProjectID:            m.ProjectID,
-		Playbook:             m.Playbook,
-		PlaybookContent:      m.PlaybookContent,
-		UnifiedJobTemplateID: m.UnifiedJobTemplateID,
-		CredentialID:         m.CredentialID,
-		ExecutionPackID:      m.ExecutionPackID,
-		Forks:                m.Forks,
-		JobType:              m.JobType,
-		Verbosity:            m.Verbosity,
-		ExtraVars:            m.ExtraVars,
-		JobLimit:             m.JobLimit,
-		AskVariablesOnLaunch: m.AskVariablesOnLaunch,
-		AskLimitOnLaunch:     m.AskLimitOnLaunch,
-		SurveyEnabled:        m.SurveyEnabled,
-		SurveySpec:           m.SurveySpec,
-		WebhookEnabled:       m.WebhookEnabled,
-		WebhookService:       m.WebhookService,
-		WebhookKey:           m.WebhookKey,
-		UseFactCache:         m.UseFactCache,
-		AllowSimultaneous:    m.AllowSimultaneous,
-		CreatedAt:            m.CreatedAt,
-		ModifiedAt:           m.ModifiedAt,
+		ID:                    m.ID,
+		OrganizationID:        m.OrganizationID,
+		Name:                  m.Name,
+		Description:           m.Description,
+		InventoryID:           m.InventoryID,
+		ProjectID:             m.ProjectID,
+		Playbook:              m.Playbook,
+		PlaybookContent:       m.PlaybookContent,
+		UnifiedJobTemplateID:  m.UnifiedJobTemplateID,
+		CredentialID:          m.CredentialID,
+		ExecutionPackID:       m.ExecutionPackID,
+		Forks:                 m.Forks,
+		JobType:               m.JobType,
+		Verbosity:             m.Verbosity,
+		ExtraVars:             m.ExtraVars,
+		JobLimit:              m.JobLimit,
+		AskVariablesOnLaunch:  m.AskVariablesOnLaunch,
+		AskLimitOnLaunch:      m.AskLimitOnLaunch,
+		AskInventoryOnLaunch:  m.AskInventoryOnLaunch,
+		AskCredentialOnLaunch: m.AskCredentialOnLaunch,
+		SurveyEnabled:         m.SurveyEnabled,
+		SurveySpec:            m.SurveySpec,
+		WebhookEnabled:        m.WebhookEnabled,
+		WebhookService:        m.WebhookService,
+		WebhookKey:            m.WebhookKey,
+		UseFactCache:          m.UseFactCache,
+		AllowSimultaneous:     m.AllowSimultaneous,
+		CreatedAt:             m.CreatedAt,
+		ModifiedAt:            m.ModifiedAt,
 	}
 }
 
@@ -307,33 +311,35 @@ func FromJobTemplates(ms []models.JobTemplate) []JobTemplate {
 
 func (d JobTemplate) ToModel() models.JobTemplate {
 	return models.JobTemplate{
-		ID:                   d.ID,
-		OrganizationID:       d.OrganizationID,
-		Name:                 d.Name,
-		Description:          d.Description,
-		InventoryID:          d.InventoryID,
-		ProjectID:            d.ProjectID,
-		Playbook:             d.Playbook,
-		PlaybookContent:      d.PlaybookContent,
-		UnifiedJobTemplateID: d.UnifiedJobTemplateID,
-		CredentialID:         d.CredentialID,
-		ExecutionPackID:      d.ExecutionPackID,
-		Forks:                d.Forks,
-		JobType:              d.JobType,
-		Verbosity:            d.Verbosity,
-		ExtraVars:            d.ExtraVars,
-		JobLimit:             d.JobLimit,
-		AskVariablesOnLaunch: d.AskVariablesOnLaunch,
-		AskLimitOnLaunch:     d.AskLimitOnLaunch,
-		SurveyEnabled:        d.SurveyEnabled,
-		SurveySpec:           d.SurveySpec,
-		WebhookEnabled:       d.WebhookEnabled,
-		WebhookService:       d.WebhookService,
-		WebhookKey:           d.WebhookKey,
-		UseFactCache:         d.UseFactCache,
-		AllowSimultaneous:    d.AllowSimultaneous,
-		CreatedAt:            d.CreatedAt,
-		ModifiedAt:           d.ModifiedAt,
+		ID:                    d.ID,
+		OrganizationID:        d.OrganizationID,
+		Name:                  d.Name,
+		Description:           d.Description,
+		InventoryID:           d.InventoryID,
+		ProjectID:             d.ProjectID,
+		Playbook:              d.Playbook,
+		PlaybookContent:       d.PlaybookContent,
+		UnifiedJobTemplateID:  d.UnifiedJobTemplateID,
+		CredentialID:          d.CredentialID,
+		ExecutionPackID:       d.ExecutionPackID,
+		Forks:                 d.Forks,
+		JobType:               d.JobType,
+		Verbosity:             d.Verbosity,
+		ExtraVars:             d.ExtraVars,
+		JobLimit:              d.JobLimit,
+		AskVariablesOnLaunch:  d.AskVariablesOnLaunch,
+		AskLimitOnLaunch:      d.AskLimitOnLaunch,
+		AskInventoryOnLaunch:  d.AskInventoryOnLaunch,
+		AskCredentialOnLaunch: d.AskCredentialOnLaunch,
+		SurveyEnabled:         d.SurveyEnabled,
+		SurveySpec:            d.SurveySpec,
+		WebhookEnabled:        d.WebhookEnabled,
+		WebhookService:        d.WebhookService,
+		WebhookKey:            d.WebhookKey,
+		UseFactCache:          d.UseFactCache,
+		AllowSimultaneous:     d.AllowSimultaneous,
+		CreatedAt:             d.CreatedAt,
+		ModifiedAt:            d.ModifiedAt,
 	}
 }
 

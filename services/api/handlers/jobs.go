@@ -156,6 +156,12 @@ func (rs *JobsResource) renderInternalError(w http.ResponseWriter, r *http.Reque
 	}
 }
 
+func (rs *JobsResource) renderResponse(w http.ResponseWriter, r *http.Request, response render.Renderer) {
+	if err := render.Render(w, r, response); err != nil {
+		rs.log.Error("render jobs response", "err", err)
+	}
+}
+
 // LaunchJob creates a new unified job with status 'pending'
 // The Scheduler will pick this up, create an execution_run, and dispatch it.
 func (rs *JobsResource) LaunchJob(w http.ResponseWriter, r *http.Request) {
@@ -170,7 +176,7 @@ func (rs *JobsResource) LaunchJob(w http.ResponseWriter, r *http.Request) {
 	}
 	var req LaunchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		render.Render(w, r, ErrInvalidRequest(err))
+		rs.renderResponse(w, r, ErrInvalidRequest(err))
 		return
 	}
 
@@ -179,34 +185,39 @@ func (rs *JobsResource) LaunchJob(w http.ResponseWriter, r *http.Request) {
 	// owns the roles, and read its prompt-on-launch flags.
 	jt, err := rs.store.LaunchTemplateInfo(r.Context(), req.UnifiedJobTemplateID)
 	if err != nil {
-		render.Render(w, r, ErrInvalidRequest(fmt.Errorf("unknown job template")))
+		rs.renderResponse(w, r, ErrInvalidRequest(fmt.Errorf("unknown job template")))
 		return
 	}
 	if !rs.authorize(w, r, rbac.JobTemplate, jt.ID, actExecute) {
 		return
 	}
+	template, err := store.NewTemplateStore(rs.DB).Get(r.Context(), jt.ID)
+	if err != nil {
+		rs.renderResponse(w, r, ErrInternal(err))
+		return
+	}
 	if req.RelaunchSourceJobID != nil {
 		source, err := rs.store.JobCancelInfo(r.Context(), *req.RelaunchSourceJobID)
 		if err != nil || source.UnifiedJobTemplateID == nil || *source.UnifiedJobTemplateID != req.UnifiedJobTemplateID {
-			render.Render(w, r, ErrInvalidRequest(fmt.Errorf("relaunch source must belong to the same job template")))
+			rs.renderResponse(w, r, ErrInvalidRequest(fmt.Errorf("relaunch source must belong to the same job template")))
 			return
 		}
 	}
 
-	// Execute access on a template is deliberately not enough to use the
-	// inventory attached to it. Re-check inventory use at launch time because a
-	// user's grants may have changed since the template was created, and because
-	// ask_limit_on_launch must never become a way to bypass inventory scope.
-	// Hosts do not have independent roles in Praetor: their authorization is
-	// inherited from the parent inventory. Ansible evaluates any supplied limit
-	// only against that already-authorized inventory.
-	var inventoryID *int64
-	if err := rs.DB.GetContext(r.Context(), &inventoryID,
-		`SELECT inventory_id FROM job_templates WHERE id=$1`, jt.ID); err != nil {
-		render.Render(w, r, ErrInternal(err))
+	// Preview and launch deliberately use the same resolver. This re-evaluates
+	// execute/use grants and prompt policy at launch time, so a preview can never
+	// become an authorization token and a revoked inventory or credential grant
+	// fails closed.
+	effective, err := (launchInputResolver{DB: rs.DB, Authorizer: rs.Authorizer}).resolve(r, template, launchPromptInput{
+		ExtraVars: req.ExtraVars,
+		Limit:     req.Limit,
+	})
+	if errors.Is(err, errLaunchResourceUnavailable) {
+		rs.renderResponse(w, r, ErrForbidden)
 		return
 	}
-	if inventoryID != nil && !rs.authorize(w, r, rbac.Inventory, *inventoryID, actUse) {
+	if err != nil {
+		rs.renderResponse(w, r, ErrInvalidRequest(err))
 		return
 	}
 
@@ -215,30 +226,17 @@ func (rs *JobsResource) LaunchJob(w http.ResponseWriter, r *http.Request) {
 	// accidental double-triggers from queuing a second overlapping run.
 	if !jt.AllowSimultaneous {
 		if active, err := rs.store.ActiveJobCount(r.Context(), req.UnifiedJobTemplateID); err == nil && active > 0 {
-			render.Render(w, r, ErrConflict(fmt.Errorf("a run of this job template is already active; wait for it to finish or enable Allow Simultaneous")))
+			rs.renderResponse(w, r, ErrConflict(fmt.Errorf("a run of this job template is already active; wait for it to finish or enable Allow Simultaneous")))
 			return
 		}
 	}
 
-	// Collect launch overrides, accepting each only if the template opts in.
-	// A survey, when enabled, is the variable-prompt mechanism: answers are
-	// validated against the spec (defaults filled, required enforced) and become
-	// extra_vars regardless of ask_variables_on_launch. Otherwise a plain
-	// variables prompt is honored only if the template asks for it.
-	var opts launch.Options
-	if jt.SurveyEnabled {
-		answers, serr := applySurvey(jt.SurveySpec, req.ExtraVars)
-		if serr != nil {
-			render.Render(w, r, ErrInvalidRequest(serr))
-			return
-		}
-		opts.ExtraVars = answers
-	} else if jt.AskVariablesOnLaunch && len(req.ExtraVars) > 0 {
-		opts.ExtraVars = req.ExtraVars
-	}
-	if jt.AskLimitOnLaunch && req.Limit != nil {
-		opts.Limit = req.Limit
-	}
+	// Store the resolved values used by the preview rather than reinterpreting
+	// the request here. Inventory and credential overrides become immutable run
+	// inputs in the next milestone step; until then this path resolves the saved
+	// references and the already-supported variables and host limit.
+	effectiveLimit := effective.Limit
+	opts := launch.Options{ExtraVars: effective.ExtraVars, Limit: &effectiveLimit}
 
 	// Insert unified_job in 'pending' state with NO current_run_id
 	// The Scheduler will:
@@ -250,15 +248,15 @@ func (rs *JobsResource) LaunchJob(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// Lost the race to a concurrent launch of a non-simultaneous template.
 		if isActiveRunConflict(err) {
-			render.Render(w, r, ErrConflict(fmt.Errorf("a run of this job template is already active; wait for it to finish or enable Allow Simultaneous")))
+			rs.renderResponse(w, r, ErrConflict(fmt.Errorf("a run of this job template is already active; wait for it to finish or enable Allow Simultaneous")))
 			return
 		}
-		render.Render(w, r, ErrInternal(err))
+		rs.renderResponse(w, r, ErrInternal(err))
 		return
 	}
 	if req.RelaunchSourceJobID != nil {
 		if err := rs.store.SetRelaunchSource(r.Context(), jobID, *req.RelaunchSourceJobID, req.UnifiedJobTemplateID); err != nil {
-			render.Render(w, r, ErrInternal(err))
+			rs.renderResponse(w, r, ErrInternal(err))
 			return
 		}
 	}

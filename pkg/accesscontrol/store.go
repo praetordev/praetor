@@ -108,11 +108,25 @@ func (s *Store) Revoke(ctx context.Context, assignment Assignment) error {
 	if table == "" {
 		return fmt.Errorf("unknown principal kind %q", assignment.PrincipalKind)
 	}
-	_, err := s.db.ExecContext(ctx, `DELETE FROM `+table+` a USING object_roles o
-		WHERE a.object_role_id = o.id AND a.role_definition_id = $1
-		AND a.`+principalColumn+` = $2 AND o.content_type = $3 AND o.object_id = $4`,
-		assignment.RoleDefinitionID, assignment.PrincipalID, string(assignment.Resource.Kind), assignment.Resource.ID)
-	return err
+	return s.transaction(ctx, func(tx *sqlx.Tx) error {
+		var objectRoleID int64
+		err := tx.GetContext(ctx, &objectRoleID, `SELECT id FROM object_roles
+			WHERE role_definition_id=$1 AND content_type=$2 AND object_id=$3`,
+			assignment.RoleDefinitionID, string(assignment.Resource.Kind), assignment.Resource.ID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+`
+			WHERE role_definition_id=$1 AND `+principalColumn+`=$2 AND object_role_id=$3`,
+			assignment.RoleDefinitionID, assignment.PrincipalID, objectRoleID); err != nil {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, `SELECT rebuild_object_role_evaluations($1)`, objectRoleID)
+		return err
+	})
 }
 
 func (s *Store) revokeGlobal(ctx context.Context, assignment Assignment) error {
@@ -120,10 +134,24 @@ func (s *Store) revokeGlobal(ctx context.Context, assignment Assignment) error {
 	if table == "" {
 		return fmt.Errorf("unknown principal kind %q", assignment.PrincipalKind)
 	}
-	_, err := s.db.ExecContext(ctx, `DELETE FROM `+table+` a USING object_roles o
-		WHERE a.object_role_id = o.id AND a.role_definition_id = $1
-		AND a.`+principalColumn+` = $2 AND o.content_type IS NULL`, assignment.RoleDefinitionID, assignment.PrincipalID)
-	return err
+	return s.transaction(ctx, func(tx *sqlx.Tx) error {
+		var objectRoleID int64
+		err := tx.GetContext(ctx, &objectRoleID, `SELECT id FROM object_roles
+			WHERE role_definition_id=$1 AND content_type IS NULL`, assignment.RoleDefinitionID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+`
+			WHERE role_definition_id=$1 AND `+principalColumn+`=$2 AND object_role_id=$3`,
+			assignment.RoleDefinitionID, assignment.PrincipalID, objectRoleID); err != nil {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, `SELECT rebuild_object_role_evaluations($1)`, objectRoleID)
+		return err
+	})
 }
 
 func assignmentTable(kind PrincipalKind) (string, string) {

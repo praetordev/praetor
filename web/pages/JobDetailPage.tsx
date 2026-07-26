@@ -136,9 +136,8 @@ const JobDetailPage = () => {
     setBusy(true);
     try {
       const response = await api.launchJob({ unified_job_template_id: job.unified_job_template_id, name: job.name, relaunch_source_job_id: job.id });
-      const nextId = response?.id ?? response?.job?.id;
       toast.success('Relaunched');
-      navigate(nextId ? `/jobs/${nextId}` : '/jobs', nextId ? { state: { job: response.job ?? response } } : undefined);
+      navigate(`/jobs/${response.id}`, { state: { job: response } });
     } catch { toast.error('Failed to relaunch'); }
     finally { setBusy(false); }
   };

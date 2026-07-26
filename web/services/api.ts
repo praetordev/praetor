@@ -80,6 +80,93 @@ export interface BulkHostDeletePreview {
     results: BulkHostDeletePreviewResult[];
 }
 
+export interface LaunchInventoryChoice {
+    id: number;
+    name: string;
+    kind: string;
+}
+
+export interface LaunchCredentialChoice {
+    id: number;
+    name: string;
+    credential_type_id: number;
+    credential_type: string;
+}
+
+export interface LaunchPromptInput {
+    inventory_id?: number;
+    credential_id?: number;
+    extra_vars?: Record<string, unknown>;
+    limit?: string;
+}
+
+export interface JobLaunchConfiguration {
+    template: {
+        id: number;
+        unified_job_template_id: number;
+        name: string;
+        organization_id: number;
+    };
+    prompts: {
+        inventory: boolean;
+        credential: boolean;
+        variables: boolean;
+        limit: boolean;
+        survey: boolean;
+    };
+    defaults: {
+        inventory_id?: number;
+        credential_id?: number;
+        extra_vars: Record<string, unknown>;
+        limit: string;
+    };
+    survey_spec?: {
+        name?: string;
+        description?: string;
+        spec?: Array<{
+            variable: string;
+            question_name: string;
+            type: 'text' | 'textarea' | 'password' | 'integer' | 'multiplechoice';
+            required: boolean;
+            default?: string | number;
+            choices?: string;
+        }>;
+    };
+    inventories: LaunchInventoryChoice[];
+    credentials: LaunchCredentialChoice[];
+}
+
+export interface JobLaunchPreview {
+    template: {
+        id: number;
+        unified_job_template_id: number;
+        name: string;
+    };
+    inventory?: LaunchInventoryChoice;
+    credential?: LaunchCredentialChoice;
+    extra_vars: Record<string, unknown>;
+    limit: string;
+    inventory_host_count: number;
+    inventory_host_sample: string[];
+    limit_applied_at_execution: boolean;
+    approval_team?: { id: number; name: string };
+}
+
+export interface JobLaunchResult {
+    id: number;
+    status: string;
+}
+
+export class ApiError extends Error {
+    status: number;
+
+    constructor(message: string, status: number) {
+        super(message);
+        this.name = 'ApiError';
+        this.status = status;
+    }
+}
+
 export const newIdempotencyKey = (scope: string) => {
     const suffix = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
         ? crypto.randomUUID()
@@ -132,9 +219,9 @@ export const fetchWithAuth = async (endpoint: string, options: RequestInit = {})
         const contentType = response.headers.get("content-type");
         if (contentType && contentType.indexOf("application/json") !== -1) {
             const errorData = await response.json();
-            throw new Error(errorData.error || errorData.message || 'API request failed');
+            throw new ApiError(errorData.error || errorData.message || 'API request failed', response.status);
         }
-        throw new Error(response.statusText || 'API request failed');
+        throw new ApiError(response.statusText || 'API request failed', response.status);
     }
 
     return response;
@@ -241,7 +328,7 @@ export const api = {
 
     // Jobs
     getJobs: () => fetchWithAuth('/jobs').then(r => r.json()),
-    launchJob: (data: any) => fetchWithAuth('/jobs', { method: 'POST', body: JSON.stringify(data) }).then(r => r.json()),
+    launchJob: (data: any, signal?: AbortSignal) => fetchWithAuth('/jobs', { method: 'POST', body: JSON.stringify(data), signal }).then(r => r.json() as Promise<JobLaunchResult>),
     bulkLaunchJobs: (items: BulkJobLaunchItem[], idempotencyKey: string) =>
         fetchWithAuth('/bulk/jobs/launch', {
             method: 'POST',
@@ -288,6 +375,14 @@ export const api = {
 
     // Templates
     getTemplates: () => fetchWithAuth('/job-templates').then(r => r.json()),
+    getJobLaunchConfiguration: (id: number, signal?: AbortSignal) =>
+        fetchWithAuth(`/job-templates/${id}/launch-configuration`, { signal }).then(r => r.json() as Promise<JobLaunchConfiguration>),
+    previewJobLaunch: (id: number, input: LaunchPromptInput, signal?: AbortSignal) =>
+        fetchWithAuth(`/job-templates/${id}/launch-preview`, {
+            method: 'POST',
+            body: JSON.stringify(input),
+            signal,
+        }).then(r => r.json() as Promise<JobLaunchPreview>),
     createTemplate: (data: any) => fetchWithAuth('/job-templates', { method: 'POST', body: JSON.stringify(data) }).then(r => r.json()),
     updateTemplate: (id: number, data: any) => fetchWithAuth(`/job-templates/${id}`, { method: 'PUT', body: JSON.stringify(data) }).then(r => r.json()),
     deleteTemplate: (id: number) => fetchWithAuth(`/job-templates/${id}`, { method: 'DELETE' }),

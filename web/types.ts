@@ -204,6 +204,8 @@ export interface JobTemplate {
   limit?: string;
   ask_variables_on_launch?: boolean;
   ask_limit_on_launch?: boolean;
+  ask_inventory_on_launch?: boolean;
+  ask_credential_on_launch?: boolean;
   survey_enabled?: boolean;
   survey_spec?: { name?: string; description?: string; spec?: SurveyQuestion[] };
   webhook_enabled?: boolean;

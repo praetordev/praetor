@@ -299,11 +299,15 @@ func TestProductValidationFixtureHasCleanEnvironmentGate(t *testing.T) {
 		t.Fatal("unrecoverable recovery fixture must quiesce the executor before removing the WAL and replacing the pod")
 	}
 	rolloutAt := strings.Index(recovery, `wait_rollout "statefulset/$RELEASE-executor"`)
-	stageRunnerAt := strings.Index(recovery, `kubectl cp "$WORK/praetor-host-runner"`)
-	stageCallbackAt := strings.Index(recovery, `kubectl cp "$EXECUTOR_ROOT/deploy/plugins/callback/praetor_checkpoint.py"`)
+	stagePackAt := strings.Index(recovery, `"$ROOT/scripts/stage-validation-execution-pack.sh"`)
 	verifyCallbackAt := strings.Index(recovery, `test -f /opt/praetor/packs/ansible-runtime/plugins/callback/praetor_checkpoint.py`)
-	if rolloutAt < 0 || stageRunnerAt < 0 || stageCallbackAt < 0 || verifyCallbackAt < 0 || !(rolloutAt < stageRunnerAt && stageRunnerAt < stageCallbackAt && stageCallbackAt < verifyCallbackAt) {
-		t.Fatal("recovery fixture must roll the executor before staging and verifying the candidate checkpoint runtime")
+	verifyRemotePackAt := strings.Index(recovery, `test -s "/tmp/build/runtime/ansible-runtime-linux-$ARCH.tar.gz"`)
+	if rolloutAt < 0 || stagePackAt < 0 || verifyCallbackAt < 0 || verifyRemotePackAt < 0 || !(rolloutAt < stagePackAt && stagePackAt < verifyCallbackAt && verifyCallbackAt < verifyRemotePackAt) {
+		t.Fatal("recovery fixture must roll the executor before staging and verifying the complete local and remote checkpoint runtime")
+	}
+	restorePackAt := strings.LastIndex(recovery, `"$ROOT/scripts/stage-validation-execution-pack.sh"`)
+	if strings.Count(recovery, `"$ROOT/scripts/stage-validation-execution-pack.sh"`) < 2 || restorePackAt < deleteAt {
+		t.Fatal("recovery fixture must restore the remote-transfer pack after its final controlled executor replacement")
 	}
 	journeyRaw, err := os.ReadFile(filepath.Join(root, "scripts", "validate-ldap-operator-journey.sh"))
 	if err != nil {

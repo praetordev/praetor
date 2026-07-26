@@ -98,7 +98,7 @@ if [[ -z "$INVENTORY_ID" || -z "$UNIFIED_TEMPLATE_ID" ]]; then
   CREATED_PROJECT_ID="$(jq -er .id <<<"$RESPONSE")"
   request POST job-templates "$(jq -nc --argjson org "$CREATED_ORGANIZATION_ID" --argjson inventory "$INVENTORY_ID" --argjson project "$CREATED_PROJECT_ID" --arg name "$PREFIX Job" '{
     organization_id:$org,inventory_id:$inventory,project_id:$project,name:$name,
-    playbook:"playbooks/ping.yml",job_type:"run",forks:1
+    playbook:"playbooks/ping.yml",job_type:"run",forks:1,ask_limit_on_launch:true
   }')"
   [[ "$STATUS" == 201 ]] || die "temporary job-template creation returned HTTP $STATUS"
   CREATED_TEMPLATE_ID="$(jq -er .id <<<"$RESPONSE")"

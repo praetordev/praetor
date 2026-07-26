@@ -30,10 +30,25 @@ on:
       - 'tests/notification_delivery_staging_contract_test.go'
       - 'services/api/handlers/bulk*.go'
       - 'services/api/handlers/delegated_launch*.go'
+      - 'services/api/handlers/access.go'
+      - 'services/api/handlers/credentials.go'
+      - 'services/api/handlers/jobs.go'
+      - 'services/api/handlers/launch_configuration.go'
+      - 'services/api/handlers/survey.go'
+      - 'services/api/handlers/templates.go'
+      - 'services/api/handlers/workflows.go'
+      - 'pkg/accesscontrol/**'
+      - 'pkg/auth/**'
+      - 'pkg/authorization/**'
+      - 'db/migrations/**'
+      - 'web/components/GovernedJobLaunchModal.tsx'
+      - 'web/components/GovernedJobLaunchModal.test.tsx'
+      - 'web/services/api.ts'
+      - 'web/services/api.launch.test.ts'
+      - 'web/pages/TemplatesPage.tsx'
       - 'web/components/ui/BulkSelection.tsx'
       - 'web/components/ui/BulkSelection.test.tsx'
       - 'web/pages/FleetScaleJourney.test.tsx'
-      - 'web/pages/TemplatesPage.tsx'
       - 'web/services/api.bulk.test.ts'
   workflow_dispatch:
     inputs:
@@ -109,6 +124,8 @@ jobs:
     if: needs.preflight.outputs.run_cluster == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    env:
+      PRAETOR_EXECUTOR_ROOT: ${{ github.workspace }}/executor
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0

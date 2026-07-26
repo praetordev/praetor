@@ -1,8 +1,9 @@
 # Product validation fixture
 
-The fixture adds synthetic LDAP identities and a local notification receiver to
-the integrated Praetor and Secrets Service development namespace. It never
-deletes the namespace, databases, persistent volumes, or Secrets Service keys.
+The fixture adds synthetic LDAP identities, a local notification receiver, and
+a disposable SSH managed host to the integrated Praetor and Secrets Service
+development namespace. It never deletes the namespace, databases, persistent
+volumes, or Secrets Service keys.
 
 ```sh
 PRAETOR_SECRETS_ROOT=../praetor-secrets ./scripts/bootstrap-product-validation-base.sh
@@ -19,19 +20,45 @@ then installs the released Praetor component set. CI runs the complete lifecycle
 from a fresh cluster.
 
 Creation is idempotent: ConfigMaps and workloads use stable names and Helm
-reuses the installed release values. Cleanup selects only resources labelled
+reuses the installed release values. The fixture generates an ephemeral
+Ed25519 identity in a namespace-scoped Secret, builds a managed-host image from
+the candidate executor's pinned Python/Ansible runtime, imports it into the
+dedicated k3d cluster, and stores the matching private key through Praetor's
+Machine credential API. This makes the governed journey exercise Secrets
+Service resolution and remote runner bootstrap rather than simulating execution
+with `ansible_connection: local`. When cleanup rotates that disposable host
+identity, it removes only the fixture hostname from the executor's persistent
+`known_hosts`; host-key verification remains enabled. Cleanup selects only resources labelled
 `app.kubernetes.io/part-of=praetor-validation-fixture` and disables the
 fixture-owned LDAP mount. API resources are deleted in dependency order by
 their reserved `Praetor Validation` names; LDAP-mapped identities and all
 unrelated platform data remain intact. All identities and passwords are synthetic.
 
 The LDAP operator journey signs in four synthetic identities through the public
-API and verifies the complete authorization boundary: organization and team
-mapping, scoped inventory and host access, authorized workflow launch, approval
-visibility limited to the assigned team, rejection of cross-team and self
-approval, successful completion, and requester/approver attribution in the
-auditor-visible activity stream. Its final output is sanitized JSON containing
-only the workflow run ID, terminal status, and synthetic actor/team names.
+API and verifies the complete governed launch boundary. It checks LDAP
+organization/team mapping; server-filtered inventory and credential choices;
+saved defaults, structured survey answers and host limits; preview resolution;
+launch-time reauthorization after a stale preview; immutable execution inputs;
+exact-host execution; governed relaunch; and assigned-team approval followed by
+execution. The negative matrix covers cross-team, cross-organization, same-org
+resources without `Use`, malformed scope-expanding limits, missing survey
+answers, and requester self-approval. Auditor-visible evidence must attribute
+preview, launch and approval to the correct synthetic actors without containing
+the disposable password-survey answer.
+
+Run it twice against the same fixture to verify rerun behavior, then prove
+fixture-owned resource cleanup and recreation:
+
+```sh
+make validation-ldap-operator-journey
+make validation-ldap-operator-journey
+./scripts/product-validation-fixture.sh cleanup
+! ./scripts/product-validation-fixture.sh status
+./scripts/product-validation-fixture.sh create
+```
+
+Its final output is sanitized JSON containing only job/workflow IDs, terminal
+status, and synthetic actor/team names.
 Set `PRAETOR_LDAP_EVIDENCE_FILE` to retain that sanitized JSON for readiness
 aggregation.
 

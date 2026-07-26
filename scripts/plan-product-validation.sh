@@ -50,7 +50,7 @@ else
   if grep -Eq '^(\.github/workflows/product-validation-fixture\.yml|deployments/(product-validation/|helm/praetor-v2/)|scripts/(bootstrap-product-validation-base|check-product-validation-fast|classify-product-validation|plan-product-validation|product-validation-fixture|generate-readiness-report)\.sh|cmd/readiness-report/|internal/readiness/)' <<<"$paths"; then
     select_all
   else
-    grep -Eq '^scripts/validate-ldap-operator-journey\.sh$' <<<"$paths" && { run_fixture=true; run_ldap=true; }
+    grep -Eq '^(scripts/validate-ldap-operator-journey\.sh|services/api/handlers/(access|credentials|jobs|launch_configuration|survey|templates|workflows)\.go|pkg/(accesscontrol|auth|authorization)/|db/migrations/|web/components/GovernedJobLaunchModal(\.test)?\.tsx|web/services/api(\.launch\.test)?\.ts|web/pages/TemplatesPage\.tsx)' <<<"$paths" && { run_fixture=true; run_ldap=true; }
     grep -Eq '^(scripts/validate-dynamic-inventory-e2e\.sh|tests/(dynamic_inventory_staging_contract|inventory_sync_history_contract)_test\.go)$' <<<"$paths" && { run_fixture=true; run_dynamic=true; }
     grep -Eq '^(scripts/validate-execution-recovery-e2e\.sh|playbooks/validate-execution-recovery\.yml)$' <<<"$paths" && { run_fixture=true; run_recovery=true; }
     grep -Eq '^(scripts/validate-notification-delivery-e2e\.sh|tests/notification_delivery_staging_contract_test\.go|web/components/NotificationDeliveryHistory\.test\.tsx)$' <<<"$paths" && { run_fixture=true; run_notification=true; }

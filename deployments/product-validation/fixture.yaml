@@ -44,6 +44,52 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  name: praetor-validation-managed-host
+  labels: {app.kubernetes.io/part-of: praetor-validation-fixture}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: praetor-validation-managed-host}
+  template:
+    metadata:
+      labels: {app: praetor-validation-managed-host, app.kubernetes.io/part-of: praetor-validation-fixture}
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: host
+          image: praetor-validation-host:validation
+          imagePullPolicy: Never
+          ports: [{name: ssh, containerPort: 22}]
+          readinessProbe: {tcpSocket: {port: ssh}, initialDelaySeconds: 2, periodSeconds: 3}
+          resources: {requests: {cpu: 25m, memory: 64Mi}, limits: {cpu: 500m, memory: 512Mi}}
+          securityContext:
+            capabilities: {drop: [ALL], add: [AUDIT_WRITE, CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID, SYS_CHROOT]}
+            runAsNonRoot: false
+            runAsUser: 0
+          volumeMounts:
+            - {name: identity, mountPath: /run/praetor/authorized_keys, subPath: authorized_keys, readOnly: true}
+            - {name: identity, mountPath: /run/praetor/hostkeys/ssh_host_ed25519_key, subPath: ssh_host_ed25519_key, readOnly: true}
+            - {name: home, mountPath: /home/praetor}
+      volumes:
+        - name: identity
+          secret:
+            secretName: praetor-validation-managed-host-identity
+            defaultMode: 0600
+        - name: home
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: praetor-validation-managed-host
+  labels: {app.kubernetes.io/part-of: praetor-validation-fixture}
+spec:
+  selector: {app: praetor-validation-managed-host}
+  ports: [{name: ssh, port: 22, targetPort: ssh}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
   name: praetor-validation-notification-sink
   labels: {app.kubernetes.io/part-of: praetor-validation-fixture}
 spec:

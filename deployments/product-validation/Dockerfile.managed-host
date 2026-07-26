@@ -1,0 +1,21 @@
+FROM praetor-executor:validation AS executor-runtime
+
+FROM executor-runtime
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends openssh-server openssh-client sudo procps iproute2 git && \
+    rm -rf /var/lib/apt/lists/* && \
+    usermod --shell /bin/bash praetor && \
+    passwd -d praetor && \
+    printf 'praetor ALL=(ALL) NOPASSWD: ALL\n' >/etc/sudoers.d/praetor && \
+    chmod 0440 /etc/sudoers.d/praetor
+
+# The governed-launch fixture validates scope and credential binding, not pack
+# construction. Using the candidate executor image as the target base keeps its
+# pinned Python and Ansible runtime ABI-compatible on both local and CI hosts.
+COPY deployments/pilot-host/sshd_config /etc/ssh/sshd_config
+COPY deployments/pilot-host/entrypoint.sh /usr/bin/praetor-pilot-entrypoint
+RUN chmod 0755 /usr/bin/praetor-pilot-entrypoint
+
+EXPOSE 22
+ENTRYPOINT ["/usr/bin/praetor-pilot-entrypoint"]

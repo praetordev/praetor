@@ -134,7 +134,17 @@ request POST bulk/hosts/create "$create_body" "$create_key"
 PHASE="bulk-launch"
 launch_body="$(jq -nc --argjson template "$UNIFIED_TEMPLATE_ID" '{
   items:[
-    {identifier:"authorized",unified_job_template_id:$template,name:"Fleet validation",limit:"Praetor Fleet E2E*"},
+    {
+      identifier:"authorized",
+      unified_job_template_id:$template,
+      name:"Fleet validation",
+      limit:"Praetor Fleet E2E*",
+      extra_vars:{
+        change_ticket:"CHG-FLEET-E2E",
+        deployment_ring:"canary",
+        approval_secret:"fleet-validation-only"
+      }
+    },
     {identifier:"unknown",unified_job_template_id:9223372036854775000,name:"Hidden"}
   ]
 }')"
@@ -146,7 +156,7 @@ jq -e '
   [.results[].status] == ["accepted","rejected"] and
   .results[1].code == "not_found_or_forbidden" and
   (.results[1].job_id // 0) == 0
-' <<<"$RESPONSE" >/dev/null || die "job launch did not fail closed with ordered mixed outcomes"
+' <<<"$RESPONSE" >/dev/null || die "job launch did not fail closed with ordered mixed outcomes: $RESPONSE"
 JOB_ID="$(jq -er '.results[0].job_id' <<<"$RESPONSE")"
 launch_response="$RESPONSE"
 request POST bulk/jobs/launch "$launch_body" "$launch_key"

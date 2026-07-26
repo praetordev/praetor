@@ -55,6 +55,11 @@ func TestReadinessAggregatorProducesSanitizedGoReport(t *testing.T) {
 	for _, name := range []string{"ldap-operator", "secrets-service", "delegated-api", "execution-recovery", "dynamic-inventory", "fleet-scale"} {
 		writeJourneyEvidence(t, dir, name, map[string]any{"run_id": "synthetic-id"})
 	}
+	writeJourneyEvidence(t, dir, "ldap-operator", map[string]any{
+		"schema_version": 2,
+		"journey":        "governed-ldap-operator",
+		"run_id":         "synthetic-id",
+	})
 	report, err := runReadinessAggregator(t, dir)
 	if err != nil {
 		t.Fatalf("aggregate: %v: %s", err, report)

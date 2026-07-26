@@ -220,6 +220,13 @@ func TestProductValidationFixtureIsScopedAndIdempotent(t *testing.T) {
 		`notification-policies?resource_type=`,
 		`ensure_policy workflow_template`,
 		`ask_limit_on_launch:true`,
+		`ssh-keygen -q -t ed25519`,
+		`k3d image import --mode direct`,
+		`ssh_private_key:$key`,
+		`hosts/$prompt_host_id/set-runner`,
+		`praetor-validation-managed-host`,
+		`forget_managed_host_key`,
+		`ssh-keygen -q -f '$known_hosts' -R 'praetor-validation-managed-host'`,
 		`persistent platform data and secrets were preserved`,
 	} {
 		if !strings.Contains(script, required) {
@@ -292,20 +299,51 @@ func TestProductValidationFixtureHasCleanEnvironmentGate(t *testing.T) {
 		t.Fatal("unrecoverable recovery fixture must quiesce the executor before removing the WAL and replacing the pod")
 	}
 	rolloutAt := strings.Index(recovery, `wait_rollout "statefulset/$RELEASE-executor"`)
-	stageRunnerAt := strings.Index(recovery, `kubectl cp "$WORK/praetor-host-runner"`)
-	stageCallbackAt := strings.Index(recovery, `kubectl cp "$EXECUTOR_ROOT/deploy/plugins/callback/praetor_checkpoint.py"`)
+	stagePackAt := strings.Index(recovery, `"$ROOT/scripts/stage-validation-execution-pack.sh"`)
 	verifyCallbackAt := strings.Index(recovery, `test -f /opt/praetor/packs/ansible-runtime/plugins/callback/praetor_checkpoint.py`)
-	if rolloutAt < 0 || stageRunnerAt < 0 || stageCallbackAt < 0 || verifyCallbackAt < 0 || !(rolloutAt < stageRunnerAt && stageRunnerAt < stageCallbackAt && stageCallbackAt < verifyCallbackAt) {
-		t.Fatal("recovery fixture must roll the executor before staging and verifying the candidate checkpoint runtime")
+	verifyRemotePackAt := strings.Index(recovery, `test -s "/tmp/build/runtime/ansible-runtime-linux-$ARCH.tar.gz"`)
+	if rolloutAt < 0 || stagePackAt < 0 || verifyCallbackAt < 0 || verifyRemotePackAt < 0 || !(rolloutAt < stagePackAt && stagePackAt < verifyCallbackAt && verifyCallbackAt < verifyRemotePackAt) {
+		t.Fatal("recovery fixture must roll the executor before staging and verifying the complete local and remote checkpoint runtime")
+	}
+	restorePackAt := strings.LastIndex(recovery, `"$ROOT/scripts/stage-validation-execution-pack.sh"`)
+	if strings.Count(recovery, `"$ROOT/scripts/stage-validation-execution-pack.sh"`) < 2 || restorePackAt < deleteAt {
+		t.Fatal("recovery fixture must restore the remote-transfer pack after its final controlled executor replacement")
 	}
 	journeyRaw, err := os.ReadFile(filepath.Join(root, "scripts", "validate-ldap-operator-journey.sh"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	journey := string(journeyRaw)
-	for _, required := range []string{"demo-operator", "mwebb", "fwalsh", "demo-auditor", "expected 403", "requested_by", "activity-stream", "workflow finished with status", "PRAETOR_LDAP_EVIDENCE_FILE", "wait_notification", "approval-notification-exact-once", "approved-notification-exact-once", "notification-resource-identity"} {
+	for _, required := range []string{
+		"demo-operator", "mwebb", "fwalsh", "demo-auditor", "expected 403",
+		"launch-configuration", "launch-preview", "stale-authorization-recheck",
+		"Praetor Validation Prompt Inventory", "Praetor Validation Prompt Credential",
+		"snapshot_version == 1", "prompted_inventory == true", "prompted_credential == true",
+		"jobs/runs/$direct_run_id/events", "scope-expanding control characters",
+		"governed-relaunch", "requested_by", "activity-stream?limit=500",
+		"workflow finished with status", "PRAETOR_LDAP_EVIDENCE_FILE",
+		"wait_notification", "wait_run_logs", "praetor-validation-excluded-host",
+		"approval-notification-exact-once",
+		"approved-notification-exact-once", "notification-resource-identity",
+		"audit-secret-redaction",
+	} {
 		if !strings.Contains(journey, required) {
 			t.Fatalf("LDAP operator journey must contain %q", required)
+		}
+	}
+	fleetLiveRaw, err := os.ReadFile(filepath.Join(root, "scripts", "validate-fleet-scale-live.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fleetLive := string(fleetLiveRaw)
+	for _, required := range []string{
+		`change_ticket:"CHG-FLEET-E2E"`,
+		`deployment_ring:"canary"`,
+		`approval_secret:"fleet-validation-only"`,
+		`[.results[].status] == ["accepted","rejected"]`,
+	} {
+		if !strings.Contains(fleetLive, required) {
+			t.Fatalf("fleet-scale live journey must contain %q", required)
 		}
 	}
 	bootstrapRaw, err := os.ReadFile(filepath.Join(root, "scripts", "bootstrap-product-validation-base.sh"))
@@ -323,6 +361,9 @@ func TestProductValidationFixtureHasCleanEnvironmentGate(t *testing.T) {
 			t.Fatalf("clean fixture workflow must not rebuild unchanged sibling source through %q", checkout)
 		}
 	}
+	if !strings.Contains(workflow, `PRAETOR_EXECUTOR_ROOT: ${{ github.workspace }}/executor`) {
+		t.Fatal("clean fixture workflow must expose the checked-out executor to every lifecycle step")
+	}
 	for _, required := range []string{"docker build", `for image in "${validation_images[@]}"`, `k3d image import --mode direct --cluster "$CLUSTER" "$image"`, "praetor-secrets:validation", "praetor-api:$validation_tag", "praetor-migrator:$validation_tag", "praetor-ui:$validation_tag", "praetor-scheduler:$validation_tag", "praetor-executor:$validation_tag", "praetor-ingestion:$validation_tag", "praetor-consumer:$validation_tag", "praetor-reconciler:$validation_tag", "praetor-secrets.image.repository", "praetor-audit-sink.image.repository", "--set image.tag", `--set hostRunner.callbackUrl="http://praetor-ingestion:8081"`} {
 		if !strings.Contains(bootstrap, required) {
 			t.Fatalf("clean fixture bootstrap must contain %q", required)
@@ -333,9 +374,24 @@ func TestProductValidationFixtureHasCleanEnvironmentGate(t *testing.T) {
 		t.Fatal(err)
 	}
 	fixture := string(fixtureRaw)
-	for _, required := range []string{"log_format notification escape=none '$request_body'", "rewrite ^ /capture break", "proxy_pass http://127.0.0.1:8080", "location = /capture { access_log off; return 204; }", "location = /permanent { return 400; }", "praetor-validation-notification-sink"} {
+	for _, required := range []string{"log_format notification escape=none '$request_body'", "rewrite ^ /capture break", "proxy_pass http://127.0.0.1:8080", "location = /capture { access_log off; return 204; }", "location = /permanent { return 400; }", "praetor-validation-notification-sink", "praetor-validation-managed-host", "imagePullPolicy: Never", "praetor-validation-managed-host-identity"} {
 		if !strings.Contains(fixture, required) {
 			t.Fatalf("notification recorder must contain %q", required)
+		}
+	}
+
+	managedHostDockerfile, err := os.ReadFile(filepath.Join(root, "deployments", "product-validation", "Dockerfile.managed-host"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{
+		"FROM praetor-executor:validation AS executor-runtime",
+		"FROM executor-runtime",
+		"openssh-server",
+		"praetor-pilot-entrypoint",
+	} {
+		if !strings.Contains(string(managedHostDockerfile), required) {
+			t.Fatalf("managed-host image must contain %q", required)
 		}
 	}
 }
@@ -380,6 +436,9 @@ func TestProductValidationJourneyPlanner(t *testing.T) {
 	}{
 		{"dynamic PR is focused", "pull_request", "all", "scripts/validate-dynamic-inventory-e2e.sh\n", map[string]string{"run_cluster": "true", "run_dynamic": "true", "run_ldap": "false", "run_readiness": "false"}},
 		{"notification PR is focused", "pull_request", "all", "scripts/validate-notification-delivery-e2e.sh\n", map[string]string{"run_cluster": "true", "run_notification": "true", "run_dynamic": "false", "run_readiness": "false"}},
+		{"launch backend selects governed LDAP", "pull_request", "all", "services/api/handlers/launch_configuration.go\n", map[string]string{"run_cluster": "true", "run_ldap": "true", "run_dynamic": "false", "run_readiness": "false"}},
+		{"launch UI selects governed LDAP", "pull_request", "all", "web/components/GovernedJobLaunchModal.tsx\n", map[string]string{"run_cluster": "true", "run_ldap": "true", "run_dynamic": "false", "run_readiness": "false"}},
+		{"unrelated UI avoids cluster", "pull_request", "all", "web/pages/Settings.tsx\n", map[string]string{"run_cluster": "false", "run_ldap": "false", "run_dynamic": "false", "run_readiness": "false"}},
 		{"generic fixture PR is complete", "pull_request", "all", "deployments/product-validation/fixture.yaml\n", map[string]string{"run_cluster": "true", "run_dynamic": "true", "run_ldap": "true", "run_readiness": "true"}},
 		{"delegated manual avoids cluster", "workflow_dispatch", "delegated-api", "", map[string]string{"run_cluster": "false", "run_delegated": "true", "run_readiness": "false"}},
 		{"fleet manual includes deployed fixture", "workflow_dispatch", "fleet-scale", "", map[string]string{"run_cluster": "true", "run_fixture": "true", "run_fleet": "true", "run_readiness": "false"}},

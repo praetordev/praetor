@@ -37,8 +37,13 @@ printf '[]\n' >"$work/journeys.json"
 for journey in "${journeys[@]}"; do
   evidence="$EVIDENCE_DIR/$journey.json"
   [[ -s "$evidence" ]] || die "missing evidence artifact $evidence"
-  jq -e --arg journey "$journey" \
-    '.schema_version == 1 and .journey == $journey and (.result == "pass" or .result == "fail" or .result == "not-applicable")' \
+  jq -e --arg journey "$journey" '
+    (
+      (.schema_version == 1 and .journey == $journey) or
+      ($journey == "ldap-operator" and .schema_version == 2 and .journey == "governed-ldap-operator")
+    ) and
+    (.result == "pass" or .result == "fail" or .result == "not-applicable")
+  ' \
     "$evidence" >/dev/null || die "invalid evidence envelope for $journey"
   if jq -e '[paths as $p | $p[-1] | select(type == "string" and test("token|password|private.?key|bind.?dn|secret.?value"; "i"))] | length > 0' "$evidence" >/dev/null; then
     die "sensitive field name detected in $journey evidence"

@@ -99,11 +99,6 @@ SINK_POD="$(kubectl get pods -n "$NAMESPACE" -l app=praetor-validation-notificat
 [[ -n "$DB_POD" && -n "$SINK_POD" ]] || die "create the product-validation fixture first"
 
 echo "==> Staging a test-only execution pack from the checked-out host runner"
-EXECUTOR_POD="$(executor_pod)"
-ARCH="$(kubectl exec -n "$NAMESPACE" "$EXECUTOR_POD" -- uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')"
-[[ "$ARCH" == amd64 || "$ARCH" == arm64 ]] || die "unsupported executor architecture '$ARCH'"
-CGO_ENABLED=0 GOOS=linux GOARCH="$ARCH" go build -o "$WORK/praetor-host-runner" ./cmd/host-runner
-
 # Apply the callback setting before staging the candidate runtime. Restarting
 # the executor runs its pack initialization, which may replace the runtime
 # directory on the packs PVC. Copying first therefore leaves the new pod with
@@ -114,22 +109,26 @@ kubectl set env -n "$NAMESPACE" "statefulset/$RELEASE-executor" \
 wait_rollout "statefulset/$RELEASE-executor"
 EXECUTOR_POD="$(executor_pod)"
 
+# Use the canonical fixture pack staging path after the rollout. In addition to
+# the installed local runtime and checkpoint callback, it restores the pack
+# tarball under /tmp/build/runtime that later remote-host journeys must push.
+PRAETOR_EXECUTOR_ROOT="$EXECUTOR_ROOT" "$ROOT/scripts/stage-validation-execution-pack.sh"
+EXECUTOR_POD="$(executor_pod)"
+ARCH="$(kubectl exec -n "$NAMESPACE" "$EXECUTOR_POD" -- uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')"
+[[ "$ARCH" == amd64 || "$ARCH" == arm64 ]] || die "unsupported executor architecture '$ARCH'"
 kubectl exec -n "$NAMESPACE" "$EXECUTOR_POD" -- sh -c \
-  'mkdir -p /opt/praetor/packs/ansible-runtime/bin /opt/praetor/packs/ansible-runtime/plugins/callback'
-kubectl cp "$WORK/praetor-host-runner" "$NAMESPACE/$EXECUTOR_POD:/opt/praetor/packs/ansible-runtime/bin/praetor-host-runner"
-[[ -f "$EXECUTOR_ROOT/deploy/plugins/callback/praetor_checkpoint.py" ]] || die "executor checkout is missing the checkpoint callback"
-kubectl cp "$EXECUTOR_ROOT/deploy/plugins/callback/praetor_checkpoint.py" \
-  "$NAMESPACE/$EXECUTOR_POD:/opt/praetor/packs/ansible-runtime/plugins/callback/praetor_checkpoint.py"
-kubectl exec -n "$NAMESPACE" "$EXECUTOR_POD" -- sh -c \
-  'chmod 0755 /opt/praetor/packs/ansible-runtime/bin/praetor-host-runner; ln -sf /usr/local/bin/ansible-playbook /opt/praetor/packs/ansible-runtime/bin/ansible-playbook; ln -sf /usr/local/bin/python3 /opt/praetor/packs/ansible-runtime/bin/python3; rm -f /var/lib/praetor/recovery-side-effects.log /var/lib/praetor/recovery-completions.log'
+  'rm -f /var/lib/praetor/recovery-side-effects.log /var/lib/praetor/recovery-completions.log'
 
 # Fail immediately if pod initialization or staging removed either candidate
-# artifact. This is cheaper and clearer than discovering it after a 60-second
-# checkpoint poll.
+# artifact or the remote-transfer archive. This is cheaper and clearer than
+# discovering it in a later journey.
 kubectl exec -n "$NAMESPACE" "$EXECUTOR_POD" -- test -x /opt/praetor/packs/ansible-runtime/bin/praetor-host-runner \
   || die "candidate host runner is missing after executor rollout"
 kubectl exec -n "$NAMESPACE" "$EXECUTOR_POD" -- test -f /opt/praetor/packs/ansible-runtime/plugins/callback/praetor_checkpoint.py \
   || die "checkpoint callback is missing after executor rollout"
+kubectl exec -n "$NAMESPACE" "$EXECUTOR_POD" -- \
+  test -s "/tmp/build/runtime/ansible-runtime-linux-$ARCH.tar.gz" \
+  || die "remote-transfer execution pack is missing after executor rollout"
 
 echo "==> Tightening only the validation recovery windows"
 kubectl set env -n "$NAMESPACE" "deployment/$RELEASE-scheduler" \
@@ -262,6 +261,15 @@ kubectl exec -n "$NAMESPACE" "$EXECUTOR_POD" -- sh -c 'kill -STOP -1; kill -STOP
 kubectl exec -n "$NAMESPACE" "$EXECUTOR_POD" -- rm -rf "/var/lib/praetor/jobs/$LOST_RUN_ID"
 kubectl delete pod -n "$NAMESPACE" "$EXECUTOR_POD" --wait=false >/dev/null
 wait_rollout "statefulset/$RELEASE-executor"
+# The controlled replacement above clears the container-local transfer cache.
+# Restore the complete pack before this journey hands the shared fixture to the
+# next test; the installed pack alone is insufficient for remote-host runs.
+PRAETOR_EXECUTOR_ROOT="$EXECUTOR_ROOT" "$ROOT/scripts/stage-validation-execution-pack.sh"
+EXECUTOR_POD="$(executor_pod)"
+ARCH="$(kubectl exec -n "$NAMESPACE" "$EXECUTOR_POD" -- uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')"
+kubectl exec -n "$NAMESPACE" "$EXECUTOR_POD" -- \
+  test -s "/tmp/build/runtime/ansible-runtime-linux-$ARCH.tar.gz" \
+  || die "remote-transfer execution pack was not restored after fault injection"
 # This is controlled fault injection: age the missing-WAL run beyond the same
 # heartbeat/grace boundaries the scheduler uses, avoiding a multi-minute test.
 dbq "update execution_runs set state='reconciling', last_heartbeat_at=now()-interval '1 hour', reconcile_after=now()-interval '1 second' where id='$LOST_RUN_ID'" >/dev/null

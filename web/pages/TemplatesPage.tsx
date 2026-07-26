@@ -4,10 +4,10 @@ import { api, newIdempotencyKey, unwrap, type BulkOperationResult } from '../ser
 import { Template, Project, Inventory, Credential, SurveyQuestion, Workflow, Job, WorkflowRunSummary } from '../types';
 import { Input, Textarea, Select } from '../components/ui/Input';
 import Button from '../components/ui/Button';
-import Modal from '../components/ui/Modal';
 import { Plus, Search, Check, Trash2, Play, ArrowLeft, GitFork, FileText, Pencil } from 'lucide-react';
 import { toast, confirmDialog } from '../components/ui/toast';
 import WorkflowLaunchModal, { WorkflowLaunchOptions } from '../components/WorkflowLaunchModal';
+import GovernedJobLaunchModal from '../components/GovernedJobLaunchModal';
 import {
   BulkActionBar,
   BulkResultPanel,
@@ -89,10 +89,6 @@ const TemplatesPage = () => {
 
   // Launch dialog
   const [launchTpl, setLaunchTpl] = useState<Template | null>(null);
-  const [launchVars, setLaunchVars] = useState('');
-  const [launchLimit, setLaunchLimit] = useState('');
-  const [launchAnswers, setLaunchAnswers] = useState<Record<string, string>>({});
-  const [launchMsg, setLaunchMsg] = useState('');
   const [launchWorkflow, setLaunchWorkflow] = useState<Workflow | null>(null);
 
   const blankQuestion = (): SurveyQuestion => ({ variable: '', question_name: '', type: 'text', required: false, default: '' });
@@ -159,30 +155,7 @@ const TemplatesPage = () => {
     catch (err: any) { toast.error(err?.message || 'Failed to delete template'); }
   };
 
-  const openLaunch = (t: Template) => {
-    setLaunchTpl(t); setLaunchVars(''); setLaunchLimit(t.limit || '');
-    const seed: Record<string, string> = {};
-    (t.survey_spec?.spec || []).forEach(q => { seed[q.variable] = q.default || ''; });
-    setLaunchAnswers(seed); setLaunchMsg('');
-  };
-  const doLaunch = async () => {
-    if (!launchTpl) return;
-    const payload: any = { unified_job_template_id: launchTpl.unified_job_template_id, name: launchTpl.name };
-    if (launchTpl.survey_enabled) {
-      const answers: Record<string, any> = {};
-      for (const q of launchTpl.survey_spec?.spec || []) {
-        const raw = launchAnswers[q.variable];
-        if (raw === undefined || raw === '') continue;
-        answers[q.variable] = q.type === 'integer' ? Number(raw) : raw;
-      }
-      payload.extra_vars = answers;
-    } else if (launchTpl.ask_variables_on_launch && launchVars.trim()) {
-      try { payload.extra_vars = JSON.parse(launchVars); } catch { setLaunchMsg('Variables must be valid JSON'); return; }
-    }
-    if (launchTpl.ask_limit_on_launch && launchLimit.trim()) payload.limit = launchLimit.trim();
-    try { await api.launchJob(payload); setLaunchTpl(null); toast.success('Launched'); }
-    catch (err) { setLaunchMsg('Launch failed'); console.error(err); }
-  };
+  const openLaunch = (t: Template) => setLaunchTpl(t);
 
   const doLaunchWorkflow = async (options: WorkflowLaunchOptions, signal?: AbortSignal) => {
     if (!launchWorkflow) return;
@@ -433,6 +406,8 @@ const TemplatesPage = () => {
 
                 {/* Prompt on launch */}
                 <FormSection title="Prompt on launch" className="mt-8">
+                  <TogRow title="Ask for inventory" sub="let the operator choose an inventory they can use" on={!!formData.ask_inventory_on_launch} onChange={v => set({ ask_inventory_on_launch: v })} />
+                  <TogRow title="Ask for credential" sub="let the operator choose an authorized machine credential" on={!!formData.ask_credential_on_launch} onChange={v => set({ ask_credential_on_launch: v })} />
                   <TogRow title="Ask for variables" sub="let the operator pass extra_vars at launch" on={!!formData.ask_variables_on_launch} onChange={v => set({ ask_variables_on_launch: v })} />
                   <TogRow title="Ask for limit" sub="let the operator narrow the host pattern" on={!!formData.ask_limit_on_launch} onChange={v => set({ ask_limit_on_launch: v })} />
                   <TogRow title="Enable survey" sub="collect structured answers before the run" on={!!formData.survey_enabled} onChange={v => set({ survey_enabled: v })} />
@@ -504,29 +479,16 @@ const TemplatesPage = () => {
       </div>
       )}
 
-      {/* Launch modal */}
-      <Modal isOpen={!!launchTpl} onClose={() => setLaunchTpl(null)} title={launchTpl ? `Launch: ${launchTpl.name}` : 'Launch'} size="md">
-        {launchTpl && (
-          <div className="space-y-4">
-            {!launchTpl.survey_enabled && !launchTpl.ask_variables_on_launch && !launchTpl.ask_limit_on_launch && <p className="text-sm text-mut">This template runs with its saved configuration.</p>}
-            {launchTpl.survey_enabled && (launchTpl.survey_spec?.spec || []).map((q, i) => {
-              const label = q.question_name || q.variable;
-              if (q.type === 'textarea') return <Textarea key={i} label={label} required={q.required} rows={3} value={launchAnswers[q.variable] || ''} onChange={e => setLaunchAnswers({ ...launchAnswers, [q.variable]: e.target.value })} />;
-              if (q.type === 'multiplechoice') return (
-                <Select key={i} label={label} required={q.required} value={launchAnswers[q.variable] || ''} onChange={e => setLaunchAnswers({ ...launchAnswers, [q.variable]: e.target.value })}>
-                  <option value="">Select…</option>
-                  {(q.choices || '').split('\n').map(c => c.trim()).filter(Boolean).map(c => <option key={c} value={c}>{c}</option>)}
-                </Select>
-              );
-              return <Input key={i} label={label} required={q.required} type={q.type === 'password' ? 'password' : q.type === 'integer' ? 'number' : 'text'} value={launchAnswers[q.variable] || ''} onChange={e => setLaunchAnswers({ ...launchAnswers, [q.variable]: e.target.value })} />;
-            })}
-            {!launchTpl.survey_enabled && launchTpl.ask_variables_on_launch && <Textarea label="Variables (JSON)" rows={4} placeholder={'{\n  "key": "value"\n}'} className="font-mono text-sm" value={launchVars} onChange={e => setLaunchVars(e.target.value)} />}
-            {launchTpl.ask_limit_on_launch && <Input label="Limit" placeholder="host pattern" value={launchLimit} onChange={e => setLaunchLimit(e.target.value)} />}
-            {launchMsg && <p className="text-sm text-err">{launchMsg}</p>}
-            <div className="mt-5 flex justify-end gap-3"><Button variant="secondary" onClick={() => setLaunchTpl(null)}>Cancel</Button><Button onClick={doLaunch} icon={<Play size={14} />}>Launch</Button></div>
-          </div>
-        )}
-      </Modal>
+      <GovernedJobLaunchModal
+        isOpen={!!launchTpl}
+        templateId={launchTpl?.id ?? null}
+        onClose={() => setLaunchTpl(null)}
+        onLaunched={job => {
+          setLaunchTpl(null);
+          toast.success('Job launched');
+          navigate(`/jobs/${job.id}`);
+        }}
+      />
       <WorkflowLaunchModal
         isOpen={!!launchWorkflow}
         workflowName={launchWorkflow?.name || 'Workflow'}

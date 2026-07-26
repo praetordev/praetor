@@ -165,8 +165,8 @@ github.com/praetordev/launch v0.1.2-0.20260721152036-bccc41205bc4 h1:UVfvn7Prv8h
 github.com/praetordev/launch v0.1.2-0.20260721152036-bccc41205bc4/go.mod h1:rCG3gRZUpzZkIC+avzl2skhOJAgPTovXtYLcxr7eCBA=
 github.com/praetordev/metrics v0.1.1 h1:ewzE8bkGN23tqBN6yBRhxdPTEyGfZBRzShjpf1NLMH0=
 github.com/praetordev/metrics v0.1.1/go.mod h1:P7KurBxnPVuDwzk9uD9vaoKvnpZoZE/DMagRQ2GRsxQ=
-github.com/praetordev/models v0.2.1 h1:+Zn+2ayyOOohXDjfL9m8e9ogoKs+hIb/tVjcgO1zKqM=
-github.com/praetordev/models v0.2.1/go.mod h1:Q0VzThsStaMr64YW3kAe8pCFT846k75RU0dJj2nETMc=
+github.com/praetordev/models v0.2.2-0.20260726103118-c7274c1cfeb3 h1:DMoQxdaNmcZ6qEilHHUsGqTI45KbFVgwGcfjoEdO6sA=
+github.com/praetordev/models v0.2.2-0.20260726103118-c7274c1cfeb3/go.mod h1:Q0VzThsStaMr64YW3kAe8pCFT846k75RU0dJj2nETMc=
 github.com/praetordev/notify v0.1.1 h1:seumbDx/Hx1uiFSdUZmZvryDycik1lchZrZs6+tcEog=
 github.com/praetordev/notify v0.1.1/go.mod h1:v87tYub+HhWUXgUUiKDUZyE5Nc98YwMSDcBJoeT2bCs=
 github.com/praetordev/objectstore v0.1.2 h1:WeI0MvVZEBOAm/yyIAuse1Y608H2b92G6lqNUkZux1g=
@@ -183,8 +183,8 @@ github.com/praetordev/render v0.1.0 h1:C8STNpDFvqmEEjiK6ccYeJM6825qoUd3osvgACSKq
 github.com/praetordev/render v0.1.0/go.mod h1:sfOmoxhgMF6ROP4lI8zAi7RoinVJVRRR1xTBgVm27ZY=
 github.com/praetordev/scheduler v0.1.6 h1:eBvjhk7IaV2TeTvUbJyvW8IYDQNi7+nRqqmcI7hYzIo=
 github.com/praetordev/scheduler v0.1.6/go.mod h1:LOq1bYPg+jY/FzS3wJ2zIDwT4dF6FWqPOXtXO3Zx79g=
-github.com/praetordev/store v0.1.6 h1:UeMRxu9y9qynRZiH6teRDPjWvPpC2/BaHVUMNt1R49A=
-github.com/praetordev/store v0.1.6/go.mod h1:ZAz9pBM3P3zF42HEfA4mDpPA8CO/USde7wR0ZgfQ4P8=
+github.com/praetordev/store v0.1.7-0.20260726103401-d0f72c54bdd7 h1:kkH6EcaemQBphvk/NlyqhhT/ZEP4KDm4OaR6V1leuzc=
+github.com/praetordev/store v0.1.7-0.20260726103401-d0f72c54bdd7/go.mod h1:RmOqUfQwm+ATMj9nbntex+kiegh2LxUofhBh25q2nX0=
 github.com/prometheus/client_golang v1.23.2 h1:Je96obch5RDVy3FDMndoUsjAhG5Edi49h0RJWRi/o0o=
 github.com/prometheus/client_golang v1.23.2/go.mod h1:Tb1a6LWHB3/SPIzCoaDXI4I8UHKeFTEQ1YCr+0Gyqmg=
 github.com/prometheus/client_model v0.6.2 h1:oBsgwpGs7iVziMvrGhE53c/GrLUsZdHnqNwqPLxwZyk=

@@ -58,7 +58,7 @@ components:
 contracts:
   github.com/praetordev/eventbus: v0.1.0
   github.com/praetordev/events: v0.1.2-0.20260721152035-6660ddd52b3a
-  github.com/praetordev/launch: v0.1.2-0.20260721152036-bccc41205bc4
+  github.com/praetordev/launch: v0.1.2-0.20260726124017-aaddb8d76b26
   github.com/praetordev/models: v0.2.2-0.20260726103118-c7274c1cfeb3
   github.com/praetordev/packspec: v0.1.0
   github.com/praetordev/rbac/v4: v4.0.0
@@ -112,7 +112,7 @@ sharedModules:
   launch:
     module: github.com/praetordev/launch
     repository: Niftel/launch
-    version: v0.1.2-0.20260721152036-bccc41205bc4
+    version: v0.1.2-0.20260726124017-aaddb8d76b26
     owner: control-plane
     securitySensitive: true
   metrics:

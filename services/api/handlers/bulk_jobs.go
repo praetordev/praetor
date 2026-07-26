@@ -32,6 +32,8 @@ type bulkJobLaunchItem struct {
 	Name                 string                 `json:"name"`
 	ExtraVars            map[string]interface{} `json:"extra_vars,omitempty"`
 	Limit                *string                `json:"limit,omitempty"`
+	InventoryID          *int64                 `json:"inventory_id,omitempty"`
+	CredentialID         *int64                 `json:"credential_id,omitempty"`
 	RelaunchSourceJobID  *int64                 `json:"relaunch_source_job_id,omitempty"`
 }
 

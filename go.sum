@@ -163,6 +163,8 @@ github.com/praetordev/ingestion v0.1.1 h1:ml1WT+RiaycVtn+gatR/P2TKGDRmzKagM1znX7
 github.com/praetordev/ingestion v0.1.1/go.mod h1:g7F+DRhp1zUkR0MN3u5VN90J5hh3oPADng9XUaIGy3Y=
 github.com/praetordev/launch v0.1.2-0.20260721152036-bccc41205bc4 h1:UVfvn7Prv8hcXvBH1MBIn24ojNxwqr+P0V77c7J8Xjg=
 github.com/praetordev/launch v0.1.2-0.20260721152036-bccc41205bc4/go.mod h1:rCG3gRZUpzZkIC+avzl2skhOJAgPTovXtYLcxr7eCBA=
+github.com/praetordev/launch v0.1.2-0.20260726124017-aaddb8d76b26 h1:nPITAnzhTUnHdXf+nsvF0ca2f9Ld8KtfsedtI0EyIXc=
+github.com/praetordev/launch v0.1.2-0.20260726124017-aaddb8d76b26/go.mod h1:rCG3gRZUpzZkIC+avzl2skhOJAgPTovXtYLcxr7eCBA=
 github.com/praetordev/metrics v0.1.1 h1:ewzE8bkGN23tqBN6yBRhxdPTEyGfZBRzShjpf1NLMH0=
 github.com/praetordev/metrics v0.1.1/go.mod h1:P7KurBxnPVuDwzk9uD9vaoKvnpZoZE/DMagRQ2GRsxQ=
 github.com/praetordev/models v0.2.2-0.20260726103118-c7274c1cfeb3 h1:DMoQxdaNmcZ6qEilHHUsGqTI45KbFVgwGcfjoEdO6sA=
@@ -183,6 +185,8 @@ github.com/praetordev/render v0.1.0 h1:C8STNpDFvqmEEjiK6ccYeJM6825qoUd3osvgACSKq
 github.com/praetordev/render v0.1.0/go.mod h1:sfOmoxhgMF6ROP4lI8zAi7RoinVJVRRR1xTBgVm27ZY=
 github.com/praetordev/scheduler v0.1.6 h1:eBvjhk7IaV2TeTvUbJyvW8IYDQNi7+nRqqmcI7hYzIo=
 github.com/praetordev/scheduler v0.1.6/go.mod h1:LOq1bYPg+jY/FzS3wJ2zIDwT4dF6FWqPOXtXO3Zx79g=
+github.com/praetordev/scheduler v0.1.7-0.20260726123844-c7a3f8e033c1 h1:d1tDtj5vrtEPH7+Y+It57y2glO0QzeBFvlU5YfY9zyA=
+github.com/praetordev/scheduler v0.1.7-0.20260726123844-c7a3f8e033c1/go.mod h1:rn2lO/RBm3pim3Oavdm3CLWcLS6EtkORb01P5p1LV/8=
 github.com/praetordev/store v0.1.7-0.20260726103401-d0f72c54bdd7 h1:kkH6EcaemQBphvk/NlyqhhT/ZEP4KDm4OaR6V1leuzc=
 github.com/praetordev/store v0.1.7-0.20260726103401-d0f72c54bdd7/go.mod h1:RmOqUfQwm+ATMj9nbntex+kiegh2LxUofhBh25q2nX0=
 github.com/prometheus/client_golang v1.23.2 h1:Je96obch5RDVy3FDMndoUsjAhG5Edi49h0RJWRi/o0o=

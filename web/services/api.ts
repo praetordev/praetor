@@ -52,6 +52,8 @@ export interface BulkJobLaunchItem {
     identifier?: string;
     unified_job_template_id: number;
     name: string;
+    inventory_id?: number;
+    credential_id?: number;
     extra_vars?: Record<string, unknown>;
     limit?: string;
 }

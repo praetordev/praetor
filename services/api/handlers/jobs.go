@@ -58,6 +58,16 @@ type JobsResource struct {
 	log           *slog.Logger
 }
 
+type jobLaunchRequest struct {
+	UnifiedJobTemplateID int64                  `json:"unified_job_template_id"`
+	Name                 string                 `json:"name"`
+	InventoryID          *int64                 `json:"inventory_id,omitempty"`
+	CredentialID         *int64                 `json:"credential_id,omitempty"`
+	ExtraVars            map[string]interface{} `json:"extra_vars,omitempty"`
+	Limit                *string                `json:"limit,omitempty"`
+	RelaunchSourceJobID  *int64                 `json:"relaunch_source_job_id,omitempty"`
+}
+
 func NewJobsResource(db *sqlx.DB, ingestionURL, internalToken string, authz *Authorizer) (*JobsResource, error) {
 	ingestionLogs, err := newIngestionLogClient(ingestionURL, internalToken)
 	if err != nil {
@@ -167,14 +177,7 @@ func (rs *JobsResource) renderResponse(w http.ResponseWriter, r *http.Request, r
 func (rs *JobsResource) LaunchJob(w http.ResponseWriter, r *http.Request) {
 	// Launch payload: the template id, an optional name, and prompt-on-launch
 	// overrides (only honored when the template opts in via its ask_* flags).
-	type LaunchRequest struct {
-		UnifiedJobTemplateID int64                  `json:"unified_job_template_id"`
-		Name                 string                 `json:"name"`
-		ExtraVars            map[string]interface{} `json:"extra_vars,omitempty"`
-		Limit                *string                `json:"limit,omitempty"`
-		RelaunchSourceJobID  *int64                 `json:"relaunch_source_job_id,omitempty"`
-	}
-	var req LaunchRequest
+	var req jobLaunchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		rs.renderResponse(w, r, ErrInvalidRequest(err))
 		return
@@ -202,6 +205,13 @@ func (rs *JobsResource) LaunchJob(w http.ResponseWriter, r *http.Request) {
 			rs.renderResponse(w, r, ErrInvalidRequest(fmt.Errorf("relaunch source must belong to the same job template")))
 			return
 		}
+		var sourceArgs json.RawMessage
+		if err := rs.DB.GetContext(r.Context(), &sourceArgs,
+			`SELECT job_args FROM unified_jobs WHERE id=$1`, *req.RelaunchSourceJobID); err != nil {
+			rs.renderResponse(w, r, ErrInvalidRequest(fmt.Errorf("relaunch source is unavailable")))
+			return
+		}
+		restoreRelaunchPrompts(&req, launch.ParseArgs(sourceArgs))
 	}
 
 	// Preview and launch deliberately use the same resolver. This re-evaluates
@@ -209,8 +219,10 @@ func (rs *JobsResource) LaunchJob(w http.ResponseWriter, r *http.Request) {
 	// become an authorization token and a revoked inventory or credential grant
 	// fails closed.
 	effective, err := (launchInputResolver{DB: rs.DB, Authorizer: rs.Authorizer}).resolve(r, template, launchPromptInput{
-		ExtraVars: req.ExtraVars,
-		Limit:     req.Limit,
+		InventoryID:  req.InventoryID,
+		CredentialID: req.CredentialID,
+		ExtraVars:    req.ExtraVars,
+		Limit:        req.Limit,
 	})
 	if errors.Is(err, errLaunchResourceUnavailable) {
 		rs.renderResponse(w, r, ErrForbidden)
@@ -231,12 +243,32 @@ func (rs *JobsResource) LaunchJob(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Store the resolved values used by the preview rather than reinterpreting
-	// the request here. Inventory and credential overrides become immutable run
-	// inputs in the next milestone step; until then this path resolves the saved
-	// references and the already-supported variables and host limit.
+	// Store both the fully resolved execution inputs and the original prompted
+	// values. The scheduler consumes only the resolved snapshot; relaunch
+	// revalidates only the values the caller actually supplied.
 	effectiveLimit := effective.Limit
-	opts := launch.Options{ExtraVars: effective.ExtraVars, Limit: &effectiveLimit}
+	opts := launch.Options{
+		SnapshotVersion:    launch.CurrentSnapshotVersion,
+		ExtraVars:          effective.ExtraVars,
+		Limit:              &effectiveLimit,
+		PromptedInventory:  req.InventoryID != nil,
+		PromptedCredential: req.CredentialID != nil,
+		PromptedExtraVars:  req.ExtraVars,
+		PromptedLimit:      req.Limit,
+	}
+	if effective.Inventory != nil {
+		id := effective.Inventory.ID
+		opts.InventoryID = &id
+	}
+	if effective.Credential != nil {
+		id := effective.Credential.ID
+		opts.CredentialID = &id
+		if effective.Credential.SecretsServiceID != nil &&
+			effective.Credential.SecretsServiceVersion != nil {
+			opts.SecretsCredentialID = effective.Credential.SecretsServiceID.String()
+			opts.SecretsCredentialVersion = *effective.Credential.SecretsServiceVersion
+		}
+	}
 
 	// Insert unified_job in 'pending' state with NO current_run_id
 	// The Scheduler will:
@@ -267,6 +299,24 @@ func (rs *JobsResource) LaunchJob(w http.ResponseWriter, r *http.Request) {
 		"id":     jobID,
 		"status": "pending",
 	})
+}
+
+func restoreRelaunchPrompts(req *jobLaunchRequest, previous launch.Options) {
+	if !previous.HasResolvedInputs() {
+		return
+	}
+	if req.InventoryID == nil && previous.PromptedInventory {
+		req.InventoryID = previous.InventoryID
+	}
+	if req.CredentialID == nil && previous.PromptedCredential {
+		req.CredentialID = previous.CredentialID
+	}
+	if req.ExtraVars == nil && previous.PromptedExtraVars != nil {
+		req.ExtraVars = previous.PromptedExtraVars
+	}
+	if req.Limit == nil && previous.PromptedLimit != nil {
+		req.Limit = previous.PromptedLimit
+	}
 }
 
 // GetExecutionRun returns details of a specific execution run

@@ -18,13 +18,13 @@ require (
 	github.com/praetordev/db v0.1.0
 	github.com/praetordev/eventbus v0.1.0
 	github.com/praetordev/ingestion v0.1.1
-	github.com/praetordev/launch v0.1.2-0.20260721152036-bccc41205bc4
+	github.com/praetordev/launch v0.1.2-0.20260726124017-aaddb8d76b26
 	github.com/praetordev/models v0.2.2-0.20260726103118-c7274c1cfeb3
 	github.com/praetordev/notify v0.1.1
 	github.com/praetordev/plog v0.1.0
 	github.com/praetordev/rbac/v4 v4.0.0
 	github.com/praetordev/render v0.1.0
-	github.com/praetordev/scheduler v0.1.6
+	github.com/praetordev/scheduler v0.1.7-0.20260726123844-c7a3f8e033c1
 	github.com/praetordev/store v0.1.7-0.20260726103401-d0f72c54bdd7
 	github.com/prometheus/client_golang v1.23.2
 	github.com/teambition/rrule-go v1.8.2

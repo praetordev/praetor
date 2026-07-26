@@ -256,6 +256,16 @@ components:
           minimum: 1
         name:
           type: string
+        inventory_id:
+          type: integer
+          format: int64
+          minimum: 1
+          nullable: true
+        credential_id:
+          type: integer
+          format: int64
+          minimum: 1
+          nullable: true
         extra_vars:
           type: object
           additionalProperties: true

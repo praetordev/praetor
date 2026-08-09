@@ -58,8 +58,8 @@ github.com/go-git/go-billy/v5 v5.9.0 h1:jItGXszUDRtR/AlferWPTMN4j38BQ88XnXKbilmm
 github.com/go-git/go-billy/v5 v5.9.0/go.mod h1:jCnQMLj9eUgGU7+ludSTYoZL/GGmii14RxKFj7ROgHw=
 github.com/go-git/go-git-fixtures/v4 v4.3.2-0.20231010084843-55a94097c399 h1:eMje31YglSBqCdIqdhKBW8lokaMrL3uTkpGYlE2OOT4=
 github.com/go-git/go-git-fixtures/v4 v4.3.2-0.20231010084843-55a94097c399/go.mod h1:1OCfN199q1Jm3HZlxleg+Dw/mwps2Wbk9frAWm+4FII=
-github.com/go-git/go-git/v5 v5.19.1 h1:nX27AnaU43/K5bKktKwgBmR9lawoYVe1Ckg0rgzzN00=
-github.com/go-git/go-git/v5 v5.19.1/go.mod h1:Pb1v0c7/g8aGQJwx9Us09W85yGoyvSwuhEGMH7zjDKQ=
+github.com/go-git/go-git/v5 v5.19.2 h1:wkfn7vOlUBu8ivAWKBWisTiwJK4jYHzTF8Ndv1LyGqY=
+github.com/go-git/go-git/v5 v5.19.2/go.mod h1:QqCBE1EFN5ddFmrliLQ3/ntRCUjZU3EJuwuB/jWEHjk=
 github.com/go-ldap/ldap/v3 v3.4.14 h1:D6PYdEgsaVzsXyr6w/yDC06Ria4uUhWm+Rb+er8lfAs=
 github.com/go-ldap/ldap/v3 v3.4.14/go.mod h1:S4eJUMUNjDkE0ZJtIZdybwyb03sGGLW6gxXT1Hs8VKA=
 github.com/go-sql-driver/mysql v1.8.1 h1:LedoTUt/eveggdHS9qUFC1EFSa8bU2+1pZjSRpvNJ1Y=
@@ -161,8 +161,6 @@ github.com/praetordev/events v0.1.2-0.20260721152035-6660ddd52b3a h1:Lk47yKK/YU8
 github.com/praetordev/events v0.1.2-0.20260721152035-6660ddd52b3a/go.mod h1:gF7ZeKJTxupPc1yPlo8HBhRdzZrRWkBbTEovgba498Y=
 github.com/praetordev/ingestion v0.1.1 h1:ml1WT+RiaycVtn+gatR/P2TKGDRmzKagM1znX7QE9I4=
 github.com/praetordev/ingestion v0.1.1/go.mod h1:g7F+DRhp1zUkR0MN3u5VN90J5hh3oPADng9XUaIGy3Y=
-github.com/praetordev/launch v0.1.2-0.20260721152036-bccc41205bc4 h1:UVfvn7Prv8hcXvBH1MBIn24ojNxwqr+P0V77c7J8Xjg=
-github.com/praetordev/launch v0.1.2-0.20260721152036-bccc41205bc4/go.mod h1:rCG3gRZUpzZkIC+avzl2skhOJAgPTovXtYLcxr7eCBA=
 github.com/praetordev/launch v0.1.2-0.20260726124017-aaddb8d76b26 h1:nPITAnzhTUnHdXf+nsvF0ca2f9Ld8KtfsedtI0EyIXc=
 github.com/praetordev/launch v0.1.2-0.20260726124017-aaddb8d76b26/go.mod h1:rCG3gRZUpzZkIC+avzl2skhOJAgPTovXtYLcxr7eCBA=
 github.com/praetordev/metrics v0.1.1 h1:ewzE8bkGN23tqBN6yBRhxdPTEyGfZBRzShjpf1NLMH0=
@@ -183,8 +181,6 @@ github.com/praetordev/registry v0.1.0 h1:QXFEMLKtkqMmcKaKlKUc5KrOT/l+rm9qoSBju4b
 github.com/praetordev/registry v0.1.0/go.mod h1:8pC6g1iSZW6mU1OvSZ4eW1tsXZuvZSnO59hLtMAGUvo=
 github.com/praetordev/render v0.1.0 h1:C8STNpDFvqmEEjiK6ccYeJM6825qoUd3osvgACSKqpU=
 github.com/praetordev/render v0.1.0/go.mod h1:sfOmoxhgMF6ROP4lI8zAi7RoinVJVRRR1xTBgVm27ZY=
-github.com/praetordev/scheduler v0.1.6 h1:eBvjhk7IaV2TeTvUbJyvW8IYDQNi7+nRqqmcI7hYzIo=
-github.com/praetordev/scheduler v0.1.6/go.mod h1:LOq1bYPg+jY/FzS3wJ2zIDwT4dF6FWqPOXtXO3Zx79g=
 github.com/praetordev/scheduler v0.1.7-0.20260726123844-c7a3f8e033c1 h1:d1tDtj5vrtEPH7+Y+It57y2glO0QzeBFvlU5YfY9zyA=
 github.com/praetordev/scheduler v0.1.7-0.20260726123844-c7a3f8e033c1/go.mod h1:rn2lO/RBm3pim3Oavdm3CLWcLS6EtkORb01P5p1LV/8=
 github.com/praetordev/store v0.1.7-0.20260726103401-d0f72c54bdd7 h1:kkH6EcaemQBphvk/NlyqhhT/ZEP4KDm4OaR6V1leuzc=
